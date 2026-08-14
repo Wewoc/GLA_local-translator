@@ -1,5 +1,7 @@
 # GLA_local-translator
 
+![GLA Local Translator](img/Banner_1.jpg)
+
 Local, offline-first translation tool with a domain-specific terminology engine.
 Split out of [GLA-NeedfulThings](https://github.com/Wewoc/GLA-NeedfulThings) so it can stand on its own.
 

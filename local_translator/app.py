@@ -11,8 +11,9 @@ Importiert aus diesem Projekt:
   - core.config: state, Konstanten
   - core.chunking: split_chunks, lang_name
   - core.logging: get_lara_usage
+  - core.diff_utils: compute_diff (nur Kohärenz-Modus)
   # write_chunk_perf_log wird via engines.ollama aufgerufen — kein Direkt-Import
-  - engines.ollama: translate_ollama, run_s2, detect_mindset, write_chunk_perf_log
+  - engines.ollama: translate_ollama, run_coherence_pass, run_s2, detect_mindset, write_chunk_perf_log
   - engines.external: translate_deepl, translate_libretranslate,
                       translate_mymemory, translate_lara
 """
@@ -63,9 +64,11 @@ from core.config import (
 from core.chunking import lang_name, split_chunks
 from core.logging import get_lara_usage
 from core import link_guard
+from core.diff_utils import compute_diff
 from terminology.terminology import term_engine
 from engines.ollama import (
     detect_mindset,
+    run_coherence_pass,
     run_s2,
     translate_ollama,
     write_chunk_perf_log,
@@ -172,6 +175,8 @@ async def translate_chunk(req: ChunkRequest):
     if not req.text.strip():
         return {"translation": ""}
 
+    diff_result = None
+
     if req.engine == "deepl":
         result = await translate_deepl(req.text, req.source_lang, req.target_lang)
     elif req.engine == "libretranslate":
@@ -191,10 +196,17 @@ async def translate_chunk(req: ChunkRequest):
             link_result.protected_text, src_lang=req.source_lang, mindset=req.mindset
         )
 
-        t0     = time.monotonic()
-        result = await translate_ollama(
-            protected_text, req.source_lang, req.target_lang, req.context, req.mindset
-        )
+        # ── Kohärenz-Modus: source_lang == target_lang → Prompt B statt S1,
+        #    kein S2 (unabhängig von einem evtl. mitgeschickten s2_model) ──────
+        coherence_mode = req.source_lang.upper() == req.target_lang.upper()
+
+        t0 = time.monotonic()
+        if coherence_mode:
+            result = await run_coherence_pass(protected_text, req.source_lang)
+        else:
+            result = await translate_ollama(
+                protected_text, req.source_lang, req.target_lang, req.context, req.mindset
+            )
         time_s1 = time.monotonic() - t0
         time_s2 = 0.0
 
@@ -206,8 +218,8 @@ async def translate_chunk(req: ChunkRequest):
             for issue in issues:
                 print(f"  [TermEngine] {issue}")
 
-        # ── S2 editiert auf restauriertem EN-Text ─────────────────────────────
-        if req.s2_model:
+        # ── S2 editiert auf restauriertem EN-Text — entfällt im Kohärenz-Modus ─
+        if req.s2_model and not coherence_mode:
             t1      = time.monotonic()
             result  = await run_s2(result, req.s2_model, req.mindset)
             time_s2 = time.monotonic() - t1
@@ -215,15 +227,27 @@ async def translate_chunk(req: ChunkRequest):
         # ── link_guard restore — nach S1+S2, ganz am Ende ──────────────────────
         result = link_guard.restore(result, link_result.mapping)
 
-        write_chunk_perf_log(req.chunk_index, len(req.text), time_s1, time_s2, req.s2_model,
+        # ── Diff gegen Original — nur Kohärenz-Modus, dient als Review-Hilfe
+        #    und als sichtbare Warnschwelle (similarity) statt stillem Fallback ─
+        if coherence_mode:
+            diff_result = compute_diff(req.text, result)
+
+        write_chunk_perf_log(req.chunk_index, len(req.text), time_s1, time_s2,
+                             "" if coherence_mode else req.s2_model,
                              terms_protected=len(code_map))
 
-    return {"translation": result}
+    response = {"translation": result}
+    if diff_result is not None:
+        response["diff"] = diff_result["segments"]
+        response["similarity"] = diff_result["similarity"]
+    return response
 
 @app.post("/translate")
 async def translate(req: TranslateRequest):
     if not req.text.strip():
         return {"translation": ""}
+
+    diff_result = None
 
     if req.engine == "deepl":
         result = await translate_deepl(req.text, req.source_lang, req.target_lang)
@@ -241,23 +265,37 @@ async def translate(req: TranslateRequest):
         protected_text, code_map = term_engine.protect(
             link_result.protected_text, src_lang=req.source_lang, mindset="general"
         )
-        t0     = time.monotonic()
-        result = await translate_ollama(protected_text, req.source_lang, req.target_lang)
+
+        coherence_mode = req.source_lang.upper() == req.target_lang.upper()
+
+        t0 = time.monotonic()
+        if coherence_mode:
+            result = await run_coherence_pass(protected_text, req.source_lang)
+        else:
+            result = await translate_ollama(protected_text, req.source_lang, req.target_lang)
         time_s1 = time.monotonic() - t0
         time_s2 = 0.0
         result = term_engine.restore(result, tgt_lang=req.target_lang,
                                      code_map=code_map, mindset="general")
-        if req.s2_model:
+        if req.s2_model and not coherence_mode:
             t1      = time.monotonic()
             result  = await run_s2(result, req.s2_model, mindset="general")
             time_s2 = time.monotonic() - t1
 
         result = link_guard.restore(result, link_result.mapping)
 
-        write_chunk_perf_log(0, len(req.text), time_s1, time_s2, req.s2_model,
+        if coherence_mode:
+            diff_result = compute_diff(req.text, result)
+
+        write_chunk_perf_log(0, len(req.text), time_s1, time_s2,
+                             "" if coherence_mode else req.s2_model,
                              terms_protected=len(code_map))
 
-    return {"translation": result}
+    response = {"translation": result}
+    if diff_result is not None:
+        response["diff"] = diff_result["segments"]
+        response["similarity"] = diff_result["similarity"]
+    return response
 
 # ── Endpoints — Ollama ────────────────────────────────────────────────────────
 

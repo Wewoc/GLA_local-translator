@@ -6,6 +6,7 @@ Two-column UI in the browser, synchronized scrolling, MD export of both texts.
 Long texts are split into chunks automatically — progress shown live during translation.
 The **▶ Translate** button switches to **■ Stop** during translation — click to abort. Completed chunks are preserved.
 Mindset auto-detection classifies the text on first typing pause and sets the optimal translation profile automatically.
+**Coherence Mode:** set **From** and **To** to the same language to run a monolingual proofreading pass instead of a translation — see below.
 
 **Multi-LLM Pipeline:** An optional S2 model can be selected in the status bar for a quality/terminology pass after S1. S2 uses the same mindset anchor as S1. Recommended: `qwen2.5:7b`.
 
@@ -72,6 +73,33 @@ The default model is set in `config.yaml` — the dropdown overrides it at runti
 The status bar also shows live VRAM usage: `VRAM: modelname (8.1 / 16 GB)` when a model is loaded, `GPU idle / 16 GB` when nothing is active. GPU total requires `nvidia-smi` — if unavailable, only the used VRAM is shown. Updates every 10 seconds.
 
 The **Term** indicator shows whether the terminology engine is active for the current language pair and mindset: `● Term DE→EN` (active) or `○ Term DE→EN (n/a)` (no terminology list available for this combination — translation runs without term protection). Tooltip: *Domain-specific terms are translated using a terminology table matched to the active mindset.*
+
+---
+
+## Coherence Mode (Monolingual Editing)
+
+When **From** and **To** are set to the same language, LocalTranslate switches from
+translation to a coherence pass: a single lightweight edit that smooths abrupt
+transitions between sentences and paragraphs in your own text, without translating
+and without changing meaning, tone, or register. Useful for proofreading your own
+writing before it goes out.
+
+- Runs over the currently selected S1 model — no separate model or setup needed.
+- The S2 quality pass and all external Final-Pass engines (DeepL, LibreTranslate,
+  MyMemory, Lara) are disabled while Coherence Mode is active — they don't apply
+  to same-language text. A small "⬡ Coherence Mode" label appears in the header.
+- The result is shown as a diff against your original text (insertions/deletions
+  highlighted), so you can see exactly what changed before trusting it.
+- If the edit deviates unusually far from the original (similarity below 60%), a
+  warning banner appears above the result — review it closely before using it.
+
+**Current scope:** only the "light" editing level (connectors and sentence
+transitions) is implemented. A stronger level (sentence restructuring) and an
+adjustable intensity slider are planned for a later session, after real-world
+testing of this first version. Long texts (> `ollama_chunk_size`, default 6000
+chars) are edited chunk by chunk without cross-chunk context — transitions
+exactly at chunk boundaries may be smoothed less effectively than transitions
+within a chunk.
 
 ---
 
@@ -187,10 +215,10 @@ After every Ollama translation, timing data is written to `logs/perf.csv`:
 | `chunk_index` | Position in the chunk sequence (0-based) |
 | `chunk_size` | Characters in this chunk |
 | `complexity` | `low` < 2000 / `medium` < 4000 / `high` ≥ 4000 chars |
-| `time_s1` | S1 translation time in seconds |
-| `time_s2` | S2 pass time in seconds (0 if disabled) |
+| `time_s1` | S1 translation time in seconds (Coherence Mode runs also log here) |
+| `time_s2` | S2 pass time in seconds (0 if disabled, always 0 in Coherence Mode) |
 | `model_s1` | Active S1 model |
-| `model_s2` | Active S2 model (empty if disabled) |
+| `model_s2` | Active S2 model (empty if disabled or in Coherence Mode) |
 | `terms_protected` | Number of domain-specific terms replaced by the terminology engine in this chunk (0 if engine inactive or no list available for the language pair) |
 
 The file is created automatically. Separator is configurable via `log_csv_separator` in `config.yaml` — default `";"` for Excel on Windows with German regional settings.

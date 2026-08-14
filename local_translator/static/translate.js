@@ -8,12 +8,19 @@
 //                          currentTranslation, mindsetDetected
 //
 // Ruft auf: updateLaraUsage, updateVramStatus (engines.js)
-//           showToast (ui.js)
+//           showToast, renderDiffHTML (ui.js)
+//
+// Kohärenz-Modus (source_lang === target_lang): kein Block mehr — das
+// Backend läuft dann Prompt B statt Übersetzung (siehe app.py, engines/
+// ollama.py). Response kann zusätzlich "diff" + "similarity" enthalten
+// (core/diff_utils.py) — wird statt Klartext gerendert, mit Warnhinweis
+// bei niedriger Ähnlichkeit (siehe COHERENCE_WARNING_THRESHOLD unten).
 //
 // HTML-onclick-Abhängigkeiten (müssen global verfügbar sein):
 //   handleTranslateBtn, deeplFinal, libreFinal, mymemoryFinal, laraFinal
 
 const CHUNK_LIMITS = { ollama: 6000, deepl: 4900, mymemory: 480 };
+const COHERENCE_WARNING_THRESHOLD = 0.6;   // difflib-Ratio — darunter: sichtbarer Warnhinweis
 
 async function translate(engine = 'ollama') {
   const text = document.getElementById('srcText').value.trim();
@@ -21,7 +28,9 @@ async function translate(engine = 'ollama') {
 
   const src = document.getElementById('srcLang').value;
   const tgt = document.getElementById('tgtLang').value;
-  if (src === tgt) { showToast('Source and target language are identical', 'err'); return; }
+  // Kohärenz-Modus: src === tgt ist erlaubt (Prompt B im Backend übernimmt
+  // dann statt Übersetzung ein einsprachiges Lektorat) — kein Block mehr.
+  const coherenceMode = src === tgt;
 
   // Mindset-Detect — erster Schritt, sobald eine Übersetzung tatsächlich
   // startet (egal ob per Button, Enter oder Debounce-Timeout ausgelöst).
@@ -55,9 +64,12 @@ async function translate(engine = 'ollama') {
   isTranslating    = true;
   abortController  = new AbortController();
   const results    = [];
+  let minSimilarity = null;
   const out        = document.getElementById('tgtOutput');
   out.textContent  = 'Translating …';
   out.className    = 'output-area loading';
+  const warnEl = document.getElementById('coherenceWarning');
+  if (warnEl) warnEl.style.display = 'none';
 
   const translateBtn       = document.getElementById('translateBtn');
   translateBtn.textContent = '■ Stop';
@@ -127,7 +139,18 @@ async function translate(engine = 'ollama') {
         context = paras[paras.length - 1].slice(-300);
 
         const cell = document.getElementById(`chunk-right-${i}`);
-        if (cell) cell.textContent = data.translation;
+        if (cell) {
+          if (data.diff) {
+            cell.innerHTML = renderDiffHTML(data.diff);
+            if (typeof data.similarity === 'number') {
+              minSimilarity = minSimilarity === null
+                ? data.similarity
+                : Math.min(minSimilarity, data.similarity);
+            }
+          } else {
+            cell.textContent = data.translation;
+          }
+        }
         document.getElementById('engineBadge').innerHTML =
           `translating… (${i + 1} / ${total} ✓) <span class="badge-pulse"></span>`;
       }
@@ -146,16 +169,29 @@ async function translate(engine = 'ollama') {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Error');
       currentTranslation = data.translation;
+
+      // Chunk-Tabelle darf nicht überschrieben werden — dieser Zweig läuft
+      // nur, wenn needsChunking von vornherein false war (siehe MAINTENANCE).
+      if (data.diff) {
+        out.innerHTML = renderDiffHTML(data.diff);
+        out.className = 'output-area';
+        if (typeof data.similarity === 'number') minSimilarity = data.similarity;
+      } else {
+        out.textContent = currentTranslation;
+        out.className   = 'output-area';
+      }
     }
 
-    if (!needsChunking) {
-      out.textContent = currentTranslation;
-      out.className   = 'output-area';
+    if (warnEl && coherenceMode && minSimilarity !== null && minSimilarity < COHERENCE_WARNING_THRESHOLD) {
+      warnEl.textContent =
+        `⚠ Auffällig große Abweichung vom Original erkannt (Ähnlichkeit ${(minSimilarity * 100).toFixed(0)}%) — bitte sorgfältig prüfen.`;
+      warnEl.style.display = '';
     }
+
     document.getElementById('tgtCount').textContent =
       `${currentTranslation.length.toLocaleString('en')} chars`;
     if (engine === 'lara') updateLaraUsage();
-    document.getElementById('engineBadge').textContent = `via ${engine}`;
+    document.getElementById('engineBadge').textContent = coherenceMode ? 'coherence pass' : `via ${engine}`;
 
   } catch (err) {
     if (err.name === 'AbortError') {

@@ -1,11 +1,13 @@
 // ── ui.js — UI-Hilfsfunktionen ──────────────────────────────────────────────
 //
 // Besitzt: showToast, clearAll, copyTranslation, exportMD, openExportDir,
-//          updateCharCount, swapLangs, updatePipelineGray
+//          updateCharCount, swapLangs, updatePipelineGray, isCoherenceMode,
+//          updateCoherenceUI, renderDiffHTML
 //
 // Liest globalen State: config, currentTranslation
 // Schreibt globalen State: currentTranslation, mindsetDetected (nur clearAll)
-// Ruft auf: checkLibre() aus engines.js (swapLangs — ok, da Click-Event)
+// Ruft auf: checkLibre() aus engines.js (swapLangs, updateCoherenceUI — ok,
+//           da Click-/Change-Event); updateCharCount (updateCoherenceUI)
 
 function showToast(msg, type = '') {
   const t = document.getElementById('toast');
@@ -25,6 +27,8 @@ function clearAll() {
   if (aiLabel) aiLabel.textContent = '';
   ['srcCount', 'tgtCount'].forEach(id =>
     document.getElementById(id).textContent = '0 chars');
+  const warnEl = document.getElementById('coherenceWarning');
+  if (warnEl) warnEl.style.display = 'none';
 }
 
 function copyTranslation() {
@@ -103,4 +107,64 @@ function updatePipelineGray() {
       opt.textContent = inUse ? `${opt.value} ✓` : opt.value;
     });
   });
+}
+
+// ── Kohärenz-Modus — Status + Diff-Rendering ────────────────────────────────
+//
+// Aktiv, wenn source_lang === target_lang: Backend läuft dann Prompt B
+// (einsprachiges Lektorat) statt Übersetzung, siehe engines/ollama.py
+// run_coherence_pass(). S2 und externe Engines ergeben in diesem Fall
+// keinen Sinn und werden hier gesperrt.
+
+function isCoherenceMode() {
+  return document.getElementById('srcLang').value === document.getElementById('tgtLang').value;
+}
+
+function updateCoherenceUI() {
+  const active = isCoherenceMode();
+
+  const s2sel = document.getElementById('s2ModelSelect');
+  if (s2sel) {
+    s2sel.disabled = active;
+    if (active) s2sel.value = '';
+  }
+
+  const deeplBtn = document.getElementById('deeplBtn');
+  if (deeplBtn) deeplBtn.disabled = active ? true : !config.deepl_available;
+
+  const laraBtn = document.getElementById('laraBtn');
+  if (laraBtn) laraBtn.disabled = active ? true : !config.lara_available;
+
+  // MyMemory/LibreTranslate haben eigene reaktive Status-Funktionen —
+  // im Kohärenz-Modus nur hart sperren, beim Verlassen deren eigene Logik
+  // erneut aufrufen statt sie hier zu duplizieren (Single Owner).
+  const mmBtn = document.getElementById('mymemoryBtn');
+  if (mmBtn) {
+    if (active) mmBtn.disabled = true;
+    else updateCharCount('srcText', 'srcCount');
+  }
+
+  const libreBtn = document.getElementById('libreBtn');
+  if (libreBtn) {
+    if (active) libreBtn.disabled = true;
+    else if (config.libretranslate_available) checkLibre();
+  }
+
+  const label = document.getElementById('coherenceLabel');
+  if (label) label.style.display = active ? '' : 'none';
+
+  if (!active) {
+    const warnEl = document.getElementById('coherenceWarning');
+    if (warnEl) warnEl.style.display = 'none';
+  }
+}
+
+function renderDiffHTML(segments) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return segments.map(seg => {
+    const text = esc(seg.text);
+    if (seg.tag === 'insert') return `<ins class="diff-insert">${text}</ins>`;
+    if (seg.tag === 'delete') return `<del class="diff-delete">${text}</del>`;
+    return text;
+  }).join('');
 }

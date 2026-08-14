@@ -1,5 +1,59 @@
 # Changelog — LocalTranslate
 
+## 2026-08-14
+
+### Added
+- Coherence Pass ("Kohärenz-Modus") — when `source_lang == target_lang`, the
+  pipeline no longer blocks the request. Instead of S1 translation,
+  `engines/ollama.py` runs a new `run_coherence_pass()` over the S1 model
+  (`state.active_model`): a language-agnostic prompt ("Prompt B") that
+  smooths transitions between sentences and paragraphs without translating —
+  the target language name is injected via the existing `lang_name()`, not
+  hardcoded to German. TermEngine and `link_guard` still wrap the call
+  exactly as before; S2 is skipped entirely in this mode (frontend disables
+  the S2 dropdown, backend ignores a stray `s2_model` defensively).
+- Wired into both `/translate` and `/translate/chunk` — deliberately
+  identical in both, per the S2-silent-skip lesson already logged below
+  (separate code paths, no shared helper — this exact mistake happened once
+  before).
+- New `core/diff_utils.py` — `compute_diff()`, a word-level
+  `difflib.SequenceMatcher` diff plus a similarity ratio (0–1), stdlib only,
+  no new dependency. Only computed in Coherence Mode; attached to the JSON
+  response as `diff` + `similarity` — no schema change for the normal
+  translation path.
+- Frontend (`ui.js`, `translate.js`, `app.js`, `index.html`, `style.css`):
+  Coherence Mode is now reflected live — S2 dropdown and all external
+  Final-Pass buttons (DeepL/LibreTranslate/MyMemory/Lara) are disabled while
+  `source_lang === target_lang`, re-enabled via each button's own existing
+  check function (`checkLibre()`, `updateCharCount()`) on exit rather than
+  duplicating that logic. A small "⬡ Coherence Mode" label shows in the
+  header when active. Output renders the word diff (`.diff-insert` /
+  `.diff-delete`) instead of plain text; a visible warning banner
+  (`.coherence-warning`) appears when `similarity < 0.6`
+  (`COHERENCE_WARNING_THRESHOLD` in `translate.js`) — no silent fallback,
+  matches this project's stated preference for loud failure over a hidden
+  revert (see the S2 silent-skip case below).
+- Perf logging: Coherence Pass runs are logged into the existing
+  `model_s1`/`time_s1` fields (`model_s2` empty, `time_s2 = 0`) — same shape
+  as a translation run with S2 disabled, no new column in `perf.csv`.
+
+### Known limitation — not fixed, logged for a future session
+- `run_coherence_pass()` does not receive the cross-chunk `context` string
+  carried between chunks (unlike `translate_ollama()`). Each chunk is edited
+  independently in Coherence Mode — for texts longer than
+  `ollama_chunk_size` (default 6000 chars), transitions exactly at chunk
+  boundaries may be smoothed less effectively than transitions within a
+  chunk. Deferred — simplest version first, per session notes.
+
+### Not part of this session (deliberately out of scope)
+- Stufe 2 (sentence-structure editing, not just connectors) and the
+  Eingriffstiefe-Regler (aggressiveness slider) from the original concept —
+  planned after real-world testing of the Stufe-1 prompt on a machine with
+  working Ollama (this session's dev machine had GPU/Python constraints and
+  could not run Ollama for live testing).
+
+---
+
 ## 2026-08-06
 
 ### Added
@@ -26,7 +80,7 @@
 - New UI dropdown "Mindset AI" in the statusbar (`mindsetModelSelect`),
   populated from the same Ollama model list as S1/S2. Follows the S2
   pattern (request-scoped, no server state) rather than the S1 pattern
-  (stateful `/ollama/set_model`) — see `REFERENCE_translator.md` for
+  (stateful, `/ollama/set_model`) — see `REFERENCE_translator.md` for
   rationale.
 - New "AI: {mindset}" label next to the mindset dropdown, shows what
   the model actually picked. Persists after translation completes —

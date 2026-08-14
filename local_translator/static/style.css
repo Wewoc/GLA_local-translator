@@ -358,3 +358,26 @@ footer {
 
 .chunk-table tr:last-child .chunk-left,
 .chunk-table tr:last-child .chunk-right { border-bottom: none; }
+
+/* ── Kohärenz-Modus — Diff + Warnhinweis ── */
+.diff-insert {
+  background: rgba(192, 132, 252, 0.22);
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.diff-delete {
+  background: rgba(255, 107, 107, 0.15);
+  color: var(--muted);
+  text-decoration: line-through;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.coherence-warning {
+  padding: 8px 20px;
+  font-size: 0.78rem;
+  color: var(--warn);
+  background: rgba(255, 107, 107, 0.08);
+  border-bottom: 1px solid var(--border);
+}

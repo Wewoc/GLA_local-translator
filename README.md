@@ -1,0 +1,49 @@
+# GLA_local-translator
+
+Local, offline-first translation tool with a domain-specific terminology engine.
+Split out of [GLA-NeedfulThings](https://github.com/Wewoc/GLA-NeedfulThings) so it can stand on its own.
+
+No cloud dependency for the core translation loop — Ollama runs locally.
+Optional final-pass engines (DeepL, LibreTranslate, MyMemory, Lara Translate) can be
+enabled via config if you want a cloud API in the mix.
+
+---
+
+## `local_translator/` — the app
+
+Two-column browser UI with synchronized scrolling: translate text, export both source
+and translation as Markdown. Ollama is the primary engine; the active model can be
+switched on the fly via the status bar dropdown.
+
+→ [Documentation](local_translator/README.md)
+
+**⚠ Constraint:** built for iterative translation (paragraph/page level), not for
+bulk-translating entire books in one pass — local LLM context limits and API quotas
+still apply.
+
+## `Terminologie-Engine/` — the term-list build pipeline
+
+Offline tool that builds the domain-specific term lists used by `local_translator`'s
+runtime terminology engine (`local_translator/terminology/`). Reads MicrosoftTermCollection
+and IATE source data, classifies terms by domain ("mindset"), and compiles them into the
+lookup tables that `local_translator` reads at runtime.
+
+Domain-specific terms are protected before translation and restored afterwards, so the LLM
+can't mistranslate, simplify, or drop established terminology mid-pipeline.
+
+→ [Documentation](Terminologie-Engine/readme.md)
+
+**Note:** no compiled term lists ship in this repo yet — `local_translator/terminology/`
+currently only contains the runtime engine code (`terminology.py`). Run the build pipeline
+in `Terminologie-Engine/` to generate them; without them, the terminology engine simply
+stays inactive and translation falls back to plain Ollama/API output.
+
+---
+
+## Origin
+
+Extracted from GLA-NeedfulThings on 2026-08-14. Both parts were already self-contained —
+no other GLA-NT module imports from either folder — so the split carries over the current
+file state with no code changes, only two documentation-path corrections in
+`Terminologie-Engine/readme.md` (the build pipeline's output path now correctly points at
+`local_translator/terminology/`, matching where the runtime engine actually looks for it).

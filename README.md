@@ -49,3 +49,11 @@ no other GLA-NT module imports from either folder — so the split carries over 
 file state with no code changes, only two documentation-path corrections in
 `Terminologie-Engine/readme.md` (the build pipeline's output path now correctly points at
 `local_translator/terminology/`, matching where the runtime engine actually looks for it).
+
+---
+
+## Development approach
+
+**Built with claude.ai"**
+following [METHODOLOGY.md](https://github.com/Wewoc/GLA-NeedfulThings/blob/main/METHODOLOGY.md)
+in GLA-NeedfulThings.

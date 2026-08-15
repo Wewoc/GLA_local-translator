@@ -1,4 +1,4 @@
-# GLA - LocalTranslate
+# LocalTranslate
 
 Local translation tool — part of the [Garmin Local Archive](https://github.com/Wewoc/Garmin_Local_Archive) ecosystem.
 Ollama as primary engine, optional Final-Pass via DeepL, LibreTranslate, MyMemory or Lara Translate.

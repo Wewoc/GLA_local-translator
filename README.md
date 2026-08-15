@@ -1,4 +1,4 @@
-# GLA_local-translator
+# local-translator
 
 ![GLA Local Translator](img/Banner_1.jpg)
 

@@ -2,6 +2,31 @@
 
 ## 2026-08-15
 
+### Fixed (live-testing follow-up)
+- Coherence Pass could leak a raw `§Lxxxxxxxx§` link_guard placeholder into
+  the visible output. Root cause: `run_coherence_pass()`'s editing prompt
+  told the model to smooth transitions but never told it to leave opaque
+  placeholder tokens alone — unlike a straight translation prompt, an
+  editing prompt is prone to "fixing" what looks like noise, and a model
+  that alters even one character of a placeholder (observed: an added
+  digit) makes `link_guard.restore()`'s exact-match `str.replace()` miss
+  it, so the mangled token stays in the output verbatim.
+- `engines/ollama.py` → `run_coherence_pass()`: prompt now explicitly
+  instructs the model to copy `§Lxxxxxxxx§`/`§Txxxxxxxx§`-shaped tokens
+  character-for-character and never alter them.
+- `core/link_guard.py`: new `verify(restored, mapping)` — scans the
+  restored text for any leftover `§L...§`-shaped token (exact-but-unreplaced
+  or model-mangled) and reports it, mirroring `TermEngine.verify()`. Doesn't
+  repair anything (no silent fallback), just makes the failure visible
+  instead of leaking silently into the UI. Wired into both `/translate` and
+  `/translate/chunk` in `app.py`, right after `link_guard.restore()` —
+  issues print server-side as `[LinkGuard] ...`, same pattern as the
+  existing `[TermEngine] ...` logging.
+- Verified: reproduced the exact failure mode (protect a bare URL, simulate
+  a model mangling the placeholder id by one digit, confirm `restore()`
+  leaves it in the text and `verify()` flags it) and confirmed the
+  clean/unmangled path still restores and verifies clean.
+
 ### Fixed
 - Coherence Pass (source_lang == target_lang) restored. The feature was
   added in full on 2026-08-14, then almost entirely undone the next day by

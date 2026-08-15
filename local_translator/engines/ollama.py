@@ -103,6 +103,10 @@ async def run_coherence_pass(text: str, lang: str) -> str:
         "— every idea in the input must remain in the output. Do not expand "
         "abbreviations. Do not alter Markdown formatting, code blocks, or structural "
         "elements. If a passage already reads smoothly, leave it exactly as is. "
+        "The text may contain opaque placeholder tokens of the form §Lxxxxxxxx§ or "
+        "§Txxxxxxxx§ (letters/digits between § marks) — copy these character-for-"
+        "character exactly as given. Never alter, split, merge, shorten, or "
+        "'correct' them, even if they look like noise or a typo. "
         "Output only the corrected text. No explanations. No comments.\n\n"
         f"{text}"
     )

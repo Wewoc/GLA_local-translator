@@ -70,6 +70,14 @@ _UNC_PATH_RE = re.compile(r"\\\\[^\s]+")
 # backtick codespans, evaluated for path-likeness after matching
 _CODESPAN_RE = re.compile(r"`([^`]+)`")
 
+# any §L...§-shaped token left in restored text — catches both an exact
+# placeholder that somehow wasn't replaced and a model-mangled variant
+# (e.g. a digit added/dropped) that restore()'s exact-match replace() can't
+# catch either way
+_PLACEHOLDER_SHAPE_RE = re.compile(
+    re.escape(PLACEHOLDER_PREFIX) + r"[^\s§]{1,20}" + re.escape(PLACEHOLDER_SUFFIX)
+)
+
 
 @dataclass
 class LinkGuardResult:
@@ -166,6 +174,24 @@ def restore(text: str, mapping: dict[str, str]) -> str:
     for placeholder, original in mapping.items():
         result = result.replace(placeholder, original)
     return result
+
+
+def verify(restored: str, mapping: dict[str, str]) -> list[str]:
+    """Gibt Warnmeldungen zurück — leer wenn alles ok.
+
+    restore() ersetzt nur exakte Treffer aus `mapping`. Ein vom Modell
+    leicht verändertes Token (z.B. eine zusätzliche/fehlende Ziffer, wie
+    beim Kohärenz-Pass beobachtet) matcht dann nicht mehr und bleibt sonst
+    unbemerkt im Output stehen — dieser Scan macht sowas sichtbar, ohne
+    es zu reparieren (kein stiller Fallback, siehe Projektkonvention)."""
+    issues = []
+    for match in _PLACEHOLDER_SHAPE_RE.findall(restored):
+        original = mapping.get(match)
+        if original:
+            issues.append(f"Code nicht ersetzt: {match} -> '{original}'")
+        else:
+            issues.append(f"Veränderter/unbekannter Platzhalter im Output hängen geblieben: {match}")
+    return issues
 
 
 if __name__ == "__main__":

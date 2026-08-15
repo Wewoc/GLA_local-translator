@@ -226,6 +226,10 @@ async def translate_chunk(req: ChunkRequest):
 
         # ── link_guard restore — nach S1+S2, ganz am Ende ──────────────────────
         result = link_guard.restore(result, link_result.mapping)
+        link_issues = link_guard.verify(result, link_result.mapping)
+        if link_issues:
+            for issue in link_issues:
+                print(f"  [LinkGuard] {issue}")
 
         # ── Diff gegen Original — nur Kohärenz-Modus, dient als Review-Hilfe
         #    und als sichtbare Warnschwelle (similarity) statt stillem Fallback ─
@@ -283,6 +287,10 @@ async def translate(req: TranslateRequest):
             time_s2 = time.monotonic() - t1
 
         result = link_guard.restore(result, link_result.mapping)
+        link_issues = link_guard.verify(result, link_result.mapping)
+        if link_issues:
+            for issue in link_issues:
+                print(f"  [LinkGuard] {issue}")
 
         if coherence_mode:
             diff_result = compute_diff(req.text, result)

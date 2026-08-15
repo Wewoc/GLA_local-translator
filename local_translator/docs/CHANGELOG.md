@@ -1,5 +1,33 @@
 # Changelog — LocalTranslate
 
+## 2026-08-15
+
+### Fixed
+- Coherence Pass (source_lang == target_lang) restored. The feature was
+  added in full on 2026-08-14, then almost entirely undone the next day by
+  an unrelated "rolback" commit (`210ecbd`) that was meant to revert
+  something else and swept this up with it. `core/diff_utils.py` was left
+  behind by that rollback — still on disk, no longer imported anywhere —
+  which is why the frontend kept showing "Source and target language are
+  identical" instead of switching into Coherence Mode.
+- Restored: `run_coherence_pass()` in `engines/ollama.py`, wiring in both
+  `/translate` and `/translate/chunk` in `app.py`, and the frontend
+  (`index.html`, `static/app.js`, `static/style.css`, `static/translate.js`,
+  `static/ui.js`) that removes the `src === tgt` block, disables S2/external
+  engines while active, and renders the word-diff with a similarity warning.
+  Content verified identical (ignoring line-ending noise) to the original
+  `a864168` commit via `git diff --ignore-space-at-eol`.
+- Verified with a mocked-Ollama FastAPI TestClient run: normal DE→EN path
+  unaffected (no `diff`/`similarity` in response, S2 still runs), DE→DE
+  triggers the coherence pass and skips S2 even when an `s2_model` is
+  requested, and the `source_lang`/`target_lang` comparison is
+  case-insensitive (`de` vs `DE` still triggers Coherence Mode).
+- Left untouched (not part of this fix, unrelated to the reported bug):
+  the same rollback commit also reverted custom-terminology-override
+  support (`custom_de.json`/`custom_en.json`) in `terminology/terminology.py`
+  and changed `pipeline_mindset_model` in `config.yaml` — both still at
+  their post-rollback state.
+
 ## 2026-08-06
 
 ### Added

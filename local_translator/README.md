@@ -122,6 +122,8 @@ Mindsets control the translation prompt — anchor, tone, style rules, and veto 
 
 Mindsets are defined in `pipeline/mindsets.json` — add or customize entries there. The `default_mindset` is set in `config.yaml`.
 
+**Adding custom terms or a whole new mindset?** See [`docs/MINDSET_HOWTO.md`](docs/MINDSET_HOWTO.md).
+
 ---
 
 ## Translation Modes

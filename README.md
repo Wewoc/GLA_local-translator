@@ -19,9 +19,14 @@ switched on the fly via the status bar dropdown.
 
 → [Documentation](local_translator/README.md)
 
-**⚠ Constraint:** built for iterative translation (paragraph/page level), not for
-bulk-translating entire books in one pass — local LLM context limits and API quotas
-still apply.
+**⚠ Constraint:** built for iterative, supervised translation (paragraph/page level),
+not for unattended bulk-translating of entire books in one pass. The chunking itself
+is a sliding window and has no hard length limit — the real constraints are: (1)
+cross-chunk context is thin (only the tail of the previous chunk is carried forward),
+so long-range coherence over hundreds of chunks isn't guaranteed, (2) no
+resume/checkpoint — an interrupted run loses progress, and (3) optional cloud
+Final-Pass engines (DeepL, MyMemory, Lara) hit rate limits or costs fast at that
+volume.
 
 ## `Terminologie-Engine/` — the term-list build pipeline
 

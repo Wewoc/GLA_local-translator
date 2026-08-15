@@ -3,7 +3,6 @@ engines/ollama.py — Ollama-Engine
 
 Besitzt:
   - translate_ollama()
-  - run_coherence_pass()
   - run_s2()
   - detect_mindset()
 
@@ -76,44 +75,6 @@ async def translate_ollama(
             r = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
             r.raise_for_status()
             return r.json().get("response", "").strip()
-        except httpx.ConnectError:
-            raise HTTPException(
-                status_code=503,
-                detail="Ollama nicht erreichbar. Läuft 'ollama serve'?",
-            )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Ollama Fehler: {e}")
-
-# ── Kohärenz-Pass — Prompt B (source_lang == target_lang) ────────────────────
-
-async def run_coherence_pass(text: str, lang: str) -> str:
-    """Einsprachiges Lektorat: glättet Übergänge zwischen Sätzen/Absätzen.
-    Läuft über state.active_model (S1-Modellauswahl) — keine Übersetzung,
-    kein S2. Sprachagnostisch — der Sprachname wird per lang_name() zur
-    Laufzeit eingesetzt, kein Hardcoding auf Deutsch."""
-    lang_display = lang_name(lang)
-
-    prompt = (
-        f"You are an editor reviewing your own {lang_display} text for coherence "
-        "between sentences and paragraphs. Your task is strictly limited to: "
-        "smoothing abrupt transitions between sentences and paragraphs, fixing "
-        "connectors where the logical flow is unclear. Do not change meaning, tone, "
-        "or register. Do not restructure sentences beyond what is necessary for a "
-        "smooth transition. Do not add new information or remove existing content "
-        "— every idea in the input must remain in the output. Do not expand "
-        "abbreviations. Do not alter Markdown formatting, code blocks, or structural "
-        "elements. If a passage already reads smoothly, leave it exactly as is. "
-        "Output only the corrected text. No explanations. No comments.\n\n"
-        f"{text}"
-    )
-    payload = {"model": state.active_model, "prompt": prompt, "stream": False}
-
-    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=180.0)) as client:
-        try:
-            r = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
-            r.raise_for_status()
-            result = r.json().get("response", "").strip()
-            return result if result else text
         except httpx.ConnectError:
             raise HTTPException(
                 status_code=503,

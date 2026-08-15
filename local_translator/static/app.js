@@ -64,22 +64,19 @@ async function init() {
   updateVramStatus();
   setInterval(updateVramStatus, 10000);
 
-  // Sprach-Dropdowns → LibreTranslate-Status + Kohärenz-Modus-UI
+  // Sprach-Dropdowns → LibreTranslate-Status
   document.getElementById('srcLang').addEventListener('change', () => {
     if (config.libretranslate_available) checkLibre();
     checkTerminology();
-    updateCoherenceUI();
   });
   document.getElementById('tgtLang').addEventListener('change', () => {
     if (config.libretranslate_available) checkLibre();
     checkTerminology();
-    updateCoherenceUI();
   });
   document.getElementById('mindsetSelect').addEventListener('change', () => {
     checkTerminology();
   });
   checkTerminology();
-  updateCoherenceUI();
 
   // Ollama-Status
   checkOllama();

@@ -5,8 +5,6 @@ Struktur:
   terminology/
     technical/de.json   {"§Txxxxxxxx§": "Betriebssystem"}
     technical/en.json   {"§Txxxxxxxx§": "Operating System"}
-    technical/custom_de.json   optional, manuelle Ergänzungen — überschreibt de.json bei Code-Kollision
-    technical/custom_en.json   optional, manuelle Ergänzungen — überschreibt en.json bei Code-Kollision
     legal/de.json + en.json
     ... (general, medical, editorial, academic, marketing, political)
 
@@ -46,15 +44,7 @@ class TermEngine:
     # ── Laden ─────────────────────────────────────────────────────────────────
 
     def _load(self, mindset: str, lang: str) -> dict:
-        """
-        Lädt mindset/lang.json — nur einmal, dann gecacht. Gibt leeres Dict bei Fehler.
-
-        Zusätzlich wird mindset/custom_lang.json geladen, falls vorhanden, und
-        in das Ergebnis gemergt. Custom-Einträge überschreiben Haupt-Einträge bei
-        Code-Kollision (§Txxxxxxxx§ ist der Schlüssel). custom_*.json wird vom
-        Build-Pipeline-Skript nicht angefasst — überlebt also Rebuilds der
-        Haupt-Listen unverändert.
-        """
+        """Lädt mindset/lang.json — nur einmal, dann gecacht. Gibt leeres Dict bei Fehler."""
         key = (mindset, lang)
         if key in self._cache:
             return self._cache[key]
@@ -62,23 +52,15 @@ class TermEngine:
         json_path = _TERMINOLOGY_DIR / mindset / f"{lang}.json"
         try:
             data = json.loads(json_path.read_text(encoding="utf-8"))
+            self._cache[key] = data
+            return data
         except FileNotFoundError:
-            data = {}
+            self._cache[key] = {}
+            return {}
         except Exception as e:
             print(f"  [TermEngine] Ladefehler {json_path}: {e}")
-            data = {}
-
-        custom_path = _TERMINOLOGY_DIR / mindset / f"custom_{lang}.json"
-        try:
-            custom_data = json.loads(custom_path.read_text(encoding="utf-8"))
-            data.update(custom_data)
-        except FileNotFoundError:
-            pass
-        except Exception as e:
-            print(f"  [TermEngine] Ladefehler {custom_path}: {e}")
-
-        self._cache[key] = data
-        return data
+            self._cache[key] = {}
+            return {}
 
     # ── check ─────────────────────────────────────────────────────────────────
 

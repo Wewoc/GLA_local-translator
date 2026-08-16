@@ -128,3 +128,5 @@ function setupInput() {
     }
   });
 }
+
+document.addEventListener('DOMContentLoaded', init);

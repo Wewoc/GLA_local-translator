@@ -1,5 +1,23 @@
 # Changelog — LocalTranslate
 
+## 2026-08-16
+
+### Fixed
+- S1/S2/Mindset-AI model dropdowns (and FROM/TO language dropdowns) stayed
+  empty on every fresh page load, regardless of which working copy the app
+  was started from and regardless of whether Ollama was reachable. Root
+  cause: `static/app.js` defines `init()` (loads `/config`, populates
+  FROM/TO + mindset + model dropdowns, starts `checkOllama()`) but nothing
+  ever called it — no `DOMContentLoaded` listener, no `<body onload>`.
+  Confirmed via Network tab: after a hard reload, `ui.js`/`engines.js`/
+  `translate.js`/`app.js` all loaded (200), but zero requests to `/config`
+  or `/ollama/status` ever fired.
+- `static/app.js`: added `document.addEventListener('DOMContentLoaded', init);`
+  at the end of the file, after `setupInput()`.
+- Verified: hard reload after the fix shows `/config` and `/ollama/status`
+  firing in the Network tab, and FROM/TO/S1/S2/Mindset-AI populate
+  correctly with the live Ollama model list.
+
 ## 2026-08-15
 
 ### Fixed (live-testing follow-up)

@@ -11,6 +11,14 @@ enabled via config if you want a cloud API in the mix.
 
 ---
 
+> **⚠️ Status: Alpha / Work in Progress**
+> LocalTranslate is under active development. There is **no guarantee of translation quality or
+> correctness**, depending also on the selected Ollama model — always review output before relying
+> on it, especially for critical, legal, or safety-relevant text. Breaking changes between versions
+> are possible.
+
+---
+
 ## `local_translator/` — the app
 
 Two-column browser UI with synchronized scrolling: translate text, export both source

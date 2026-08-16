@@ -2,27 +2,27 @@
 setlocal enabledelayedexpansion
 title LocalTranslate
 echo.
-echo  LocalTranslate – Starte...
+echo  LocalTranslate – Starting...
 echo.
 
-:: Python pruefen
+:: Check Python
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo  [FEHLER] Python nicht gefunden.
-    echo  Bitte Python installieren: https://www.python.org/downloads/
+    echo  [ERROR] Python not found.
+    echo  Please install Python: https://www.python.org/downloads/
     pause
     exit /b 1
 )
 
-:: Docker pruefen
+:: Check Docker
 :check_docker
 docker --version >nul 2>&1
 if errorlevel 1 (
-    echo  [WARNUNG] Docker nicht erreichbar – LibreTranslate nicht verfuegbar.
-    echo  Bitte Docker Desktop starten.
+    echo  [WARNING] Docker unreachable – LibreTranslate not available.
+    echo  Please start Docker Desktop.
     echo.
-    echo  [R] Erneut versuchen   [S] Ueberspringen
-    set /p docker_choice=Auswahl: 
+    echo  [R] Retry   [S] Skip
+    set /p docker_choice=Choice: 
     if /i "!docker_choice!"=="r" goto check_docker
     if /i "!docker_choice!"=="s" goto docker_done
     goto check_docker
@@ -31,15 +31,15 @@ echo  Docker online.
 :docker_done
 echo.
 
-:: Ollama pruefen
+:: Check Ollama
 :check_ollama
 curl -s --max-time 3 http://localhost:11434 >nul 2>&1
 if errorlevel 1 (
-    echo  [WARNUNG] Ollama nicht erreichbar.
-    echo  Bitte Ollama Desktop App starten.
+    echo  [WARNING] Ollama unreachable.
+    echo  Please start the Ollama Desktop App.
     echo.
-    echo  [R] Erneut versuchen   [S] Ueberspringen
-    set /p ollama_choice=Auswahl: 
+    echo  [R] Retry   [S] Skip
+    set /p ollama_choice=Choice: 
     if /i "!ollama_choice!"=="r" goto check_ollama
     if /i "!ollama_choice!"=="s" goto ollama_done
     goto check_ollama
@@ -48,15 +48,15 @@ echo  Ollama online.
 :ollama_done
 echo.
 
-:: Dependencies installieren falls noetig
-echo  Pruefe Abhaengigkeiten...
+:: Install dependencies if needed
+echo  Checking dependencies...
 pip show fastapi >nul 2>&1
 if errorlevel 1 (
-    echo  Installiere Abhaengigkeiten...
+    echo  Installing dependencies...
     pip install fastapi uvicorn httpx pyyaml python-dotenv lara-sdk --quiet
 )
 
-:: LibreTranslate starten falls aktiviert
+:: Start LibreTranslate if enabled
 findstr /i "libretranslate_enabled: true" config.yaml >nul 2>&1
 if not errorlevel 1 (
     echo  LibreTranslate enabled – starting Docker container...
@@ -82,8 +82,8 @@ if not errorlevel 1 (
     echo.
 )
 
-:: Starten
-echo  Starte Server...
+:: Start
+echo  Starting server...
 echo.
 python app.py
 

@@ -1,41 +1,41 @@
 #!/bin/bash
 echo ""
-echo " LocalTranslate – Starte..."
+echo " LocalTranslate – Starting..."
 echo ""
 
-# Python pruefen
+# Check Python
 if ! command -v python3 &> /dev/null; then
-    echo " [FEHLER] Python3 nicht gefunden."
+    echo " [ERROR] Python3 not found."
     exit 1
 fi
 
-# Dependencies installieren
-echo " Pruefe Abhaengigkeiten..."
+# Install dependencies
+echo " Checking dependencies..."
 pip3 show fastapi > /dev/null 2>&1 || pip3 install fastapi uvicorn httpx pyyaml python-dotenv lara-sdk --quiet
 
-# LibreTranslate aktiviert? → Opt-in abfragen
+# LibreTranslate enabled? → ask for opt-in
 USE_LIBRE=false
 if grep -qi "libretranslate_enabled: true" config.yaml; then
-    read -p " LibreTranslate (Docker) verwenden? [j/N] " libre_choice
-    if [[ "$libre_choice" =~ ^[Jj]$ ]]; then
+    read -p " Use LibreTranslate (Docker)? [y/N] " libre_choice
+    if [[ "$libre_choice" =~ ^[Yy]$ ]]; then
         USE_LIBRE=true
     else
-        echo " LibreTranslate wird uebersprungen."
+        echo " Skipping LibreTranslate."
     fi
     echo ""
 fi
 
-# Docker pruefen (nur wenn LibreTranslate gewuenscht)
+# Check Docker (only if LibreTranslate was requested)
 if [ "$USE_LIBRE" = true ]; then
     check_docker() {
         command -v docker &> /dev/null && docker info > /dev/null 2>&1
     }
 
     while ! check_docker; do
-        echo " [WARNUNG] Docker nicht erreichbar – LibreTranslate nicht verfuegbar."
-        echo " Bitte Docker Desktop starten."
-        echo " [R] Erneut versuchen   [S] Ueberspringen"
-        read -p " Auswahl: " docker_choice
+        echo " [WARNING] Docker unreachable – LibreTranslate not available."
+        echo " Please start Docker Desktop."
+        echo " [R] Retry   [S] Skip"
+        read -p " Choice: " docker_choice
         if [[ "$docker_choice" =~ ^[Ss]$ ]]; then
             USE_LIBRE=false
             break
@@ -47,15 +47,15 @@ if [ "$USE_LIBRE" = true ]; then
     echo ""
 fi
 
-# Ollama pruefen
+# Check Ollama
 check_ollama() {
     curl -s --max-time 3 http://localhost:11434 > /dev/null 2>&1
 }
 
 while ! check_ollama; do
-    echo " [WARNUNG] Ollama nicht erreichbar. Bitte Ollama starten."
-    echo " [R] Erneut versuchen   [S] Ueberspringen"
-    read -p " Auswahl: " ollama_choice
+    echo " [WARNING] Ollama unreachable. Please start Ollama."
+    echo " [R] Retry   [S] Skip"
+    read -p " Choice: " ollama_choice
     if [[ "$ollama_choice" =~ ^[Ss]$ ]]; then
         break
     fi
@@ -65,7 +65,7 @@ if check_ollama; then
 fi
 echo ""
 
-# LibreTranslate starten falls aktiviert und gewuenscht
+# Start LibreTranslate if enabled and requested
 if [ "$USE_LIBRE" = true ]; then
     echo " LibreTranslate enabled – starting Docker container..."
     if ! command -v docker &> /dev/null; then
@@ -89,6 +89,6 @@ if [ "$USE_LIBRE" = true ]; then
     echo ""
 fi
 
-echo " Starte Server..."
+echo " Starting server..."
 echo ""
 python3 app.py

@@ -177,20 +177,20 @@ def restore(text: str, mapping: dict[str, str]) -> str:
 
 
 def verify(restored: str, mapping: dict[str, str]) -> list[str]:
-    """Gibt Warnmeldungen zurück — leer wenn alles ok.
+    """Returns warning messages — empty if everything is ok.
 
-    restore() ersetzt nur exakte Treffer aus `mapping`. Ein vom Modell
-    leicht verändertes Token (z.B. eine zusätzliche/fehlende Ziffer, wie
-    beim Kohärenz-Pass beobachtet) matcht dann nicht mehr und bleibt sonst
-    unbemerkt im Output stehen — dieser Scan macht sowas sichtbar, ohne
-    es zu reparieren (kein stiller Fallback, siehe Projektkonvention)."""
+    restore() only replaces exact matches from `mapping`. A token slightly
+    altered by the model (e.g. an added/missing digit, as observed with the
+    Coherence Pass) then no longer matches and otherwise stays in the output
+    unnoticed — this scan makes that visible without repairing it (no silent
+    fallback, per project convention)."""
     issues = []
     for match in _PLACEHOLDER_SHAPE_RE.findall(restored):
         original = mapping.get(match)
         if original:
-            issues.append(f"Code nicht ersetzt: {match} -> '{original}'")
+            issues.append(f"Code not replaced: {match} -> '{original}'")
         else:
-            issues.append(f"Veränderter/unbekannter Platzhalter im Output hängen geblieben: {match}")
+            issues.append(f"Altered/unknown placeholder left hanging in output: {match}")
     return issues
 
 
@@ -202,7 +202,7 @@ if __name__ == "__main__":
         "[Firmenwebseite](https://example.com)\n"
         "See also `src/docs/REFERENCE_GARMIN.md` and `ppr/core/` for details.\n"
         "Path on disk: C:\\Users\\Timo\\Documents\\notes.txt\n"
-        "und/oder sollte hier NICHT geschützt werden."
+        "and/or should NOT be protected here."
     )
 
     guarded = protect(sample)

@@ -1,23 +1,23 @@
 """
-filter_terminology.py — Nachfilter für bereits gebaute Terminologielisten
+filter_terminology.py — Post-filter for already-built terminology lists
 
-Drei unabhängige Pässe — einzeln oder kombiniert ausführbar:
+Three independent passes — runnable individually or combined:
 
-  Pass 1 — Blocklist (default, immer aktiv)
-    Entfernt Fragmente, Alltagswörter, Großbuchstaben-Artefakte.
+  Pass 1 — Blocklist (default, always active)
+    Removes fragments, everyday words, uppercase-letter artifacts.
 
-  Pass 2 — Ollama-Filter (--filter)
-    Ollama bewertet: "Ist das ein echter Fachbegriff für diese Domäne?"
-    Empfohlen: mistral oder qwen2.5:7b
+  Pass 2 — Ollama filter (--filter)
+    Ollama judges: "Is this a genuine domain-specific term for this domain?"
+    Recommended: mistral or qwen2.5:7b
 
-  Pass 3 — Validierung (--validate)
-    aya-expanse bewertet: "Ist die DE->EN Übersetzung korrekt?"
-    Prüft Übersetzungsqualität der Paare, nicht nur ob es ein Fachbegriff ist.
-    Empfohlen: aya-expanse:latest (mehrsprachig, kennt DE/EN Terminologie)
+  Pass 3 — Validation (--validate)
+    aya-expanse judges: "Is the DE->EN translation correct?"
+    Checks translation quality of the pairs, not just whether it's a domain term.
+    Recommended: aya-expanse:latest (multilingual, knows DE/EN terminology)
 
-Backup wird vor jedem Schreibvorgang angelegt (terminology/{mindset}/backup/).
+A backup is created before every write (terminology/{mindset}/backup/).
 
-Aufruf:
+Usage:
   python filter_terminology.py --dir ../terminology
   python filter_terminology.py --dir ../terminology --dry-run
   python filter_terminology.py --dir ../terminology --filter --model mistral
@@ -35,26 +35,26 @@ import time
 import urllib.request
 from pathlib import Path
 
-# ── Konfiguration ─────────────────────────────────────────────────────────────
+# ── Configuration ─────────────────────────────────────────────────────────────
 #
-# Verschärfte Blocklist gegenüber build_terminology.py:
+# Stricter blocklist compared to build_terminology.py:
 #
-#   r"^\w{1,4}$"          zu kurz (1-4 Zeichen)
-#                         fängt: ping, ring, fore, sire, rent, thin, time, task
+#   r"^\w{1,4}$"          too short (1-4 characters)
+#                         catches: ping, ring, fore, sire, rent, thin, time, task
 #
-#   r"^\d+"               beginnt mit Ziffer
+#   r"^\d+"               starts with a digit
 #
-#   r"^\(.*\)$"           komplett in Klammern
+#   r"^\(.*\)$"           entirely in parentheses
 #
-#   r"^[A-ZÄÖÜ]{2,}$"    nur Großbuchstaben (NICHT, ODER, REICH, LARGE, FAST, MODE)
-#                         Ausnahme: ACRONYM_ALLOWLIST
+#   r"^[A-ZÄÖÜ]{2,}$"    uppercase only (NICHT, ODER, REICH, LARGE, FAST, MODE)
+#                         exception: ACRONYM_ALLOWLIST
 #
-#   r"^[a-z]{1,5}$"       kurze Kleinbuchstaben-Fragmente aus IATE-Parsing
-#                         fängt: adit, cant, fore, quire, fines, mounts
+#   r"^[a-z]{1,5}$"       short lowercase fragments from IATE parsing
+#                         catches: adit, cant, fore, quire, fines, mounts
 #
-#   r"^[A-Z][a-z]{1,4}$"  kurze kapitalisierte Wörter (Here, More, Other, Excel)
+#   r"^[A-Z][a-z]{1,4}$"  short capitalized words (Here, More, Other, Excel)
 #
-#   r"^(ja|nein|...)$"    Alltagswörter
+#   r"^(ja|nein|...)$"    everyday words
 BLOCKLIST_PATTERNS = [
     r"^\w{1,4}$",
     r"^\d+",
@@ -66,7 +66,7 @@ BLOCKLIST_PATTERNS = [
     r"^(Eiche|Sonde|Frist|Sache|Spiel|Dauer|Dichte|Boden|Welle|Stein|Kraft)$",
 ]
 
-# Akronyme die trotz Großbuchstaben behalten werden
+# Acronyms kept despite being uppercase
 ACRONYM_ALLOWLIST = {
     "VRAM", "API", "CPU", "GPU", "RAM", "ROM", "SQL", "XML", "JSON", "HTTP",
     "HTTPS", "FTP", "SSH", "TCP", "UDP", "DNS", "URL", "URI", "HTML", "CSS",
@@ -77,10 +77,10 @@ ACRONYM_ALLOWLIST = {
 ALL_MINDSETS = ["general", "technical", "legal", "medical",
                 "editorial", "academic", "marketing", "political"]
 
-# ── Ollama-Hilfsfunktion ──────────────────────────────────────────────────────
+# ── Ollama Helper Function ────────────────────────────────────────────────────
 
 def _ollama_call(prompt: str, model: str, host: str, timeout: int = 120) -> str:
-    """Führt einen einzelnen Ollama-Call aus. Gibt Response-Text zurück."""
+    """Runs a single Ollama call. Returns the response text."""
     payload = json.dumps({
         "model": model, "prompt": prompt, "stream": False
     }).encode()
@@ -93,7 +93,7 @@ def _ollama_call(prompt: str, model: str, host: str, timeout: int = 120) -> str:
 
 
 def _parse_number_list(response: str, batch_len: int) -> set:
-    """Parst eine kommagetrennte Nummernliste aus einer Ollama-Antwort."""
+    """Parses a comma-separated number list from an Ollama response."""
     indices = set()
     if response.lower() == "none":
         return indices
@@ -123,7 +123,7 @@ def filter_pair(de_term: str, en_term: str) -> bool:
         return True
     return False
 
-# ── Pass 2: Ollama-Fachbegriff-Filter ────────────────────────────────────────
+# ── Pass 2: Ollama Domain-Term Filter ────────────────────────────────────────
 
 def ollama_filter_batch(
     pairs: list[tuple],
@@ -133,8 +133,8 @@ def ollama_filter_batch(
     batch_size: int = 30,
 ) -> list[tuple]:
     """
-    Pass 2 — Fachbegriff-Filter.
-    Frage: "Ist das ein echter Fachbegriff für diese Domäne?"
+    Pass 2 — domain-term filter.
+    Question: "Is this a genuine domain-specific term for this domain?"
     """
     CONTEXT = {
         "general":   "general-purpose reference",
@@ -148,7 +148,7 @@ def ollama_filter_batch(
     }
     context = CONTEXT.get(mindset, "professional documents")
 
-    # ── Checkpoint laden ──────────────────────────────────────────────────────
+    # ── Load checkpoint ───────────────────────────────────────────────────────
     checkpoint_path = Path(__file__).resolve().parent / f".filter2_checkpoint_{mindset}.json"
     start_batch = 0
     kept, skipped = [], 0
@@ -161,15 +161,15 @@ def ollama_filter_batch(
                 kept_codes  = set(cp["kept_codes"])
                 kept        = [p for p in pairs if p[0] in kept_codes]
                 skipped     = cp["skipped"]
-                print(f"    Resume ab Batch {start_batch + 1} ({len(kept)} bereits behalten)")
+                print(f"    Resuming from batch {start_batch + 1} ({len(kept)} already kept)")
             else:
-                print(f"    Checkpoint veraltet — starte neu")
+                print(f"    Checkpoint outdated — starting over")
                 checkpoint_path.unlink()
         except Exception:
-            print(f"    Checkpoint unlesbar — starte neu")
+            print(f"    Checkpoint unreadable — starting over")
             checkpoint_path.unlink()
 
-    print(f"    Pass 2 Fachbegriff-Filter [{mindset}]: {len(pairs)} Paare ...")
+    print(f"    Pass 2 domain-term filter [{mindset}]: {len(pairs)} pairs ...")
     total = (len(pairs) + batch_size - 1) // batch_size
 
     for i in range(start_batch * batch_size, len(pairs), batch_size):
@@ -194,8 +194,8 @@ def ollama_filter_batch(
             for idx in sorted(indices):
                 kept.append(batch[idx])
             skipped += len(batch) - len(indices)
-            print(f"      Batch {bn}/{total}: {len(indices)} behalten, "
-                  f"{len(batch)-len(indices)} gefiltert")
+            print(f"      Batch {bn}/{total}: {len(indices)} kept, "
+                  f"{len(batch)-len(indices)} filtered")
             checkpoint_path.write_text(json.dumps({
                 "mindset": mindset, "model": model,
                 "total_pairs": len(pairs), "completed_batches": bn,
@@ -203,15 +203,15 @@ def ollama_filter_batch(
             }, ensure_ascii=False), encoding="utf-8")
             time.sleep(0.1)
         except Exception as ex:
-            print(f"      [WARN] Batch {bn}: {ex} — unveraendert behalten")
+            print(f"      [WARN] Batch {bn}: {ex} — kept unchanged")
             kept.extend(batch)
 
     if checkpoint_path.exists():
         checkpoint_path.unlink()
-    print(f"    -> {len(kept)} behalten, {skipped} gefiltert")
+    print(f"    -> {len(kept)} kept, {skipped} filtered")
     return kept
 
-# ── Pass 3: Übersetzungsvalidierung ──────────────────────────────────────────
+# ── Pass 3: Translation Validation ───────────────────────────────────────────
 
 def ollama_validate_batch(
     pairs: list[tuple],
@@ -221,11 +221,11 @@ def ollama_validate_batch(
     batch_size: int = 20,
 ) -> list[tuple]:
     """
-    Pass 3 — Übersetzungsqualität.
-    Frage: "Ist die DE->EN Übersetzung korrekt und natürlich?"
+    Pass 3 — translation quality.
+    Question: "Is the DE->EN translation correct and natural?"
 
-    Kleinere Batches (20 statt 30) weil die Aufgabe schwieriger ist
-    und aya-expanse beide Sprachen gleichzeitig beurteilen muss.
+    Smaller batches (20 instead of 30) because the task is harder
+    and aya-expanse has to judge both languages at once.
     """
     DOMAIN = {
         "general":   "general professional",
@@ -239,7 +239,7 @@ def ollama_validate_batch(
     }
     domain = DOMAIN.get(mindset, "professional")
 
-    # ── Checkpoint laden ──────────────────────────────────────────────────────
+    # ── Load checkpoint ───────────────────────────────────────────────────────
     checkpoint_path = Path(__file__).resolve().parent / f".filter3_checkpoint_{mindset}.json"
     start_batch = 0
     kept, rejected = [], 0
@@ -252,15 +252,15 @@ def ollama_validate_batch(
                 kept_codes  = set(cp["kept_codes"])
                 kept        = [p for p in pairs if p[0] in kept_codes]
                 rejected    = cp["rejected"]
-                print(f"    Resume ab Batch {start_batch + 1} ({len(kept)} bereits behalten)")
+                print(f"    Resuming from batch {start_batch + 1} ({len(kept)} already kept)")
             else:
-                print(f"    Checkpoint veraltet — starte neu")
+                print(f"    Checkpoint outdated — starting over")
                 checkpoint_path.unlink()
         except Exception:
-            print(f"    Checkpoint unlesbar — starte neu")
+            print(f"    Checkpoint unreadable — starting over")
             checkpoint_path.unlink()
 
-    print(f"    Pass 3 Uebersetzungsvalidierung [{mindset}]: {len(pairs)} Paare ...")
+    print(f"    Pass 3 translation validation [{mindset}]: {len(pairs)} pairs ...")
     total = (len(pairs) + batch_size - 1) // batch_size
 
     for i in range(start_batch * batch_size, len(pairs), batch_size):
@@ -287,8 +287,8 @@ def ollama_validate_batch(
             for idx in sorted(indices):
                 kept.append(batch[idx])
             rejected += len(batch) - len(indices)
-            print(f"      Batch {bn}/{total}: {len(indices)} behalten, "
-                  f"{len(batch)-len(indices)} abgelehnt")
+            print(f"      Batch {bn}/{total}: {len(indices)} kept, "
+                  f"{len(batch)-len(indices)} rejected")
             checkpoint_path.write_text(json.dumps({
                 "mindset": mindset, "model": model,
                 "total_pairs": len(pairs), "completed_batches": bn,
@@ -296,15 +296,15 @@ def ollama_validate_batch(
             }, ensure_ascii=False), encoding="utf-8")
             time.sleep(0.1)
         except Exception as ex:
-            print(f"      [WARN] Batch {bn}: {ex} — unveraendert behalten")
+            print(f"      [WARN] Batch {bn}: {ex} — kept unchanged")
             kept.extend(batch)
 
     if checkpoint_path.exists():
         checkpoint_path.unlink()
-    print(f"    -> {len(kept)} behalten, {rejected} abgelehnt")
+    print(f"    -> {len(kept)} kept, {rejected} rejected")
     return kept
 
-# ── Hauptfunktion pro Mindset ─────────────────────────────────────────────────
+# ── Main Function Per Mindset ─────────────────────────────────────────────────
 
 def filter_mindset(
     mindset_dir: Path,
@@ -319,17 +319,17 @@ def filter_mindset(
     en_path = mindset_dir / "en.json"
 
     if not de_path.exists() or not en_path.exists():
-        print(f"  [{mindset}] SKIP — de.json oder en.json fehlt")
+        print(f"  [{mindset}] SKIP — de.json or en.json missing")
         return {}
 
     de_data = json.loads(de_path.read_text(encoding="utf-8"))
     en_data = json.loads(en_path.read_text(encoding="utf-8"))
 
     if not de_data:
-        print(f"  [{mindset}] SKIP — leer")
+        print(f"  [{mindset}] SKIP — empty")
         return {}
 
-    print(f"  [{mindset}] {len(de_data)} Eintraege")
+    print(f"  [{mindset}] {len(de_data)} entries")
 
     # ── Pass 1: Blocklist ─────────────────────────────────────────────────────
     pairs_in = [(code, de_data[code], en_data.get(code, ""))
@@ -337,26 +337,26 @@ def filter_mindset(
     pairs_ok = [(code, de, en) for code, de, en in pairs_in
                 if not filter_pair(de, en)]
     removed_blocklist = len(pairs_in) - len(pairs_ok)
-    print(f"    Pass 1 Blocklist: {removed_blocklist} entfernt, {len(pairs_ok)} verbleiben")
+    print(f"    Pass 1 blocklist: {removed_blocklist} removed, {len(pairs_ok)} remaining")
 
-    # ── Pass 2: Fachbegriff-Filter ────────────────────────────────────────────
+    # ── Pass 2: Domain-term filter ────────────────────────────────────────────
     if use_filter and pairs_ok:
         pairs_ok = ollama_filter_batch(
             pairs_ok, mindset, ollama_model, ollama_host
         )
 
-    # ── Pass 3: Übersetzungsvalidierung ──────────────────────────────────────
+    # ── Pass 3: Translation validation ────────────────────────────────────────
     if use_validate and pairs_ok:
         pairs_ok = ollama_validate_batch(
             pairs_ok, mindset, ollama_model, ollama_host
         )
 
-    # ── Backup + Schreiben ────────────────────────────────────────────────────
+    # ── Backup + Write ────────────────────────────────────────────────────────
     total_removed = len(pairs_in) - len(pairs_ok)
 
     if dry_run:
-        print(f"    DRY RUN — wuerde {total_removed} Eintraege entfernen "
-              f"({len(pairs_ok)} verbleiben)")
+        print(f"    DRY RUN — would remove {total_removed} entries "
+              f"({len(pairs_ok)} remaining)")
         return {"before": len(pairs_in), "after": len(pairs_ok), "removed": total_removed}
 
     backup_dir = mindset_dir / "backup"
@@ -371,8 +371,8 @@ def filter_mindset(
     de_path.write_text(json.dumps(new_de, ensure_ascii=False, indent=2), encoding="utf-8")
     en_path.write_text(json.dumps(new_en, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"    -> {len(new_de)} Eintraege geschrieben "
-          f"({total_removed} entfernt, Backup in backup/)")
+    print(f"    -> {len(new_de)} entries written "
+          f"({total_removed} removed, backup in backup/)")
 
     return {"before": len(pairs_in), "after": len(new_de), "removed": total_removed}
 
@@ -380,38 +380,38 @@ def filter_mindset(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Nachfilter fuer bereits gebaute Terminologielisten (3 Paesse)"
+        description="Post-filter for already-built terminology lists (3 passes)"
     )
     parser.add_argument("--dir",      type=Path, required=True,
-                        help="Pfad zum terminology-Ordner")
+                        help="Path to the terminology folder")
     parser.add_argument("--mindset",  nargs="*", default=ALL_MINDSETS,
-                        help="Mindsets filtern (default: alle)")
+                        help="Filter mindsets (default: all)")
     parser.add_argument("--filter",   action="store_true",
-                        help="Pass 2: Ollama-Fachbegriff-Filter aktivieren")
+                        help="Enable pass 2: Ollama domain-term filter")
     parser.add_argument("--validate", action="store_true",
-                        help="Pass 3: Uebersetzungsvalidierung via aya-expanse aktivieren")
+                        help="Enable pass 3: translation validation via aya-expanse")
     parser.add_argument("--model",    default="aya-expanse:latest",
-                        help="Ollama-Modell (default: aya-expanse:latest)")
+                        help="Ollama model (default: aya-expanse:latest)")
     parser.add_argument("--host",     default="http://localhost:11434",
-                        help="Ollama-Host")
+                        help="Ollama host")
     parser.add_argument("--dry-run",  action="store_true",
-                        help="Nur anzeigen was entfernt wuerde, nichts schreiben")
+                        help="Only show what would be removed, write nothing")
     args = parser.parse_args()
 
     if not args.dir.exists():
-        print(f"[FEHLER] Ordner nicht gefunden: {args.dir}")
+        print(f"[ERROR] Folder not found: {args.dir}")
         sys.exit(1)
 
     print()
-    print("  filter_terminology — Nachfilter")
+    print("  filter_terminology — post-filter")
     passes = ["Pass 1: Blocklist"]
-    if args.filter:   passes.append("Pass 2: Fachbegriff-Filter")
-    if args.validate: passes.append("Pass 3: Uebersetzungsvalidierung")
-    print(f"  Aktive Paesse: {' + '.join(passes)}")
+    if args.filter:   passes.append("Pass 2: Domain-term filter")
+    if args.validate: passes.append("Pass 3: Translation validation")
+    print(f"  Active passes: {' + '.join(passes)}")
     if args.validate or args.filter:
-        print(f"  Modell: {args.model}")
+        print(f"  Model: {args.model}")
     if args.dry_run:
-        print("  DRY RUN — keine Dateien werden veraendert")
+        print("  DRY RUN — no files will be changed")
     print()
 
     total_stats = {}
@@ -431,13 +431,13 @@ def main():
         print()
 
     if total_stats:
-        print("  Zusammenfassung:")
+        print("  Summary:")
         total_before  = sum(s["before"]  for s in total_stats.values())
         total_after   = sum(s["after"]   for s in total_stats.values())
         total_removed = total_before - total_after
         for mindset, s in total_stats.items():
             print(f"    {mindset:12} {s['before']:>6} -> {s['after']:>6} (-{s['removed']})")
-        print(f"    {'GESAMT':12} {total_before:>6} -> {total_after:>6} (-{total_removed})")
+        print(f"    {'TOTAL':12} {total_before:>6} -> {total_after:>6} (-{total_removed})")
     print()
 
 

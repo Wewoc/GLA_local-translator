@@ -1,14 +1,14 @@
 """
-core/config.py — Konfiguration, Konstanten, RuntimeState
+core/config.py — configuration, constants, runtime state
 
-Besitzt:
+Contains:
   - load_config(), load_mindsets()
-  - Alle Konstanten aus config.yaml und .env
-  - RuntimeState mit active_model
-  - Pfad-Management (PROJECT_ROOT-basiert)
+  - All constants from config.yaml and .env
+  - RuntimeState with active_model
+  - Path management (PROJECT_ROOT-based)
 
-Wird importiert von: allen anderen Modulen.
-Importiert niemanden aus diesem Projekt.
+Imported by: all other modules.
+Does not import anything else from this project.
 """
 
 import json
@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-# ── Pfade ─────────────────────────────────────────────────────────────────────
+# ── Paths ─────────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT  = Path(__file__).resolve().parent.parent
 CONFIG_PATH   = PROJECT_ROOT / "config.yaml"
@@ -26,7 +26,7 @@ MINDSETS_PATH = PROJECT_ROOT / "pipeline" / "mindsets.json"
 LARA_USAGE_FILE = PROJECT_ROOT / "lara_usage.json"
 INDEX_PATH    = PROJECT_ROOT / "index.html"
 
-# ── Config laden ──────────────────────────────────────────────────────────────
+# ── Load config ───────────────────────────────────────────────────────────────
 
 load_dotenv(PROJECT_ROOT / ".env")
 
@@ -43,7 +43,7 @@ def load_mindsets() -> dict:
 cfg      = load_config()
 MINDSETS = load_mindsets()
 
-# ── Konstanten ────────────────────────────────────────────────────────────────
+# ── Constants ─────────────────────────────────────────────────────────────────
 
 OLLAMA_URL   = cfg.get("ollama_url", "http://localhost:11434")
 OLLAMA_MODEL = cfg.get("ollama_model", "mistral")
@@ -74,8 +74,8 @@ DEFAULT_MODE   = cfg.get("default_mode", "debounce")
 DEFAULT_MINDSET = cfg.get("default_mindset", "general")
 
 OLLAMA_CHUNK_SIZE   = cfg.get("ollama_chunk_size", 6000)
-DEEPL_CHUNK_SIZE    = 4900   # fest — DeepL API-Limit
-MYMEMORY_CHUNK_SIZE = 480    # fest — MyMemory API-Limit
+DEEPL_CHUNK_SIZE    = 4900   # fixed — DeepL API limit
+MYMEMORY_CHUNK_SIZE = 480    # fixed — MyMemory API limit
 
 LOG_DIR = PROJECT_ROOT / cfg.get("log_dir", "logs").lstrip("./")
 PERF_LOG = LOG_DIR / "perf.csv"
@@ -91,7 +91,7 @@ S3_MODEL = cfg.get("pipeline_s3_model", "")  # removed feature, kept for compat
 
 MINDSET_MODEL = cfg.get("pipeline_mindset_model", "")   # empty = fallback to state.active_model
 
-# ── Verzeichnisse anlegen ─────────────────────────────────────────────────────
+# ── Create directories ────────────────────────────────────────────────────────
 
 EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -99,7 +99,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 # ── Runtime State ─────────────────────────────────────────────────────────────
 
 class RuntimeState:
-    """Laufzeit-Variablen — Werte die sich nach dem Start ändern können."""
+    """Runtime variables — values that can change after startup."""
     active_model: str = OLLAMA_MODEL
 
 state = RuntimeState()

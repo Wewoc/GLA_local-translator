@@ -1,20 +1,20 @@
 """
-engines/ollama.py — Ollama-Engine
+engines/ollama.py — Ollama engine
 
-Besitzt:
+Contains:
   - translate_ollama()
   - run_coherence_pass()
   - run_s2()
   - detect_mindset()
 
-Importiert:
+Imports:
   - httpx, re, fastapi.HTTPException
   - core.config: OLLAMA_URL, MINDSETS, state
   - core.chunking: lang_name
   - core.logging: _write_perf_log
   - terminology.terminology: term_engine
 
-Wird importiert von: app.py
+Imported by: app.py
 """
 
 import re
@@ -27,7 +27,7 @@ from core.chunking import lang_name
 from core.logging import _write_perf_log
 from terminology.terminology import term_engine
 
-# ── S1 — Primärübersetzung ────────────────────────────────────────────────────
+# ── S1 — Primary Translation ──────────────────────────────────────────────────
 
 async def translate_ollama(
     text: str,
@@ -79,18 +79,18 @@ async def translate_ollama(
         except httpx.ConnectError:
             raise HTTPException(
                 status_code=503,
-                detail="Ollama nicht erreichbar. Läuft 'ollama serve'?",
+                detail="Ollama unreachable. Is 'ollama serve' running?",
             )
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Ollama Fehler: {e}")
+            raise HTTPException(status_code=500, detail=f"Ollama error: {e}")
 
-# ── Kohärenz-Pass — Prompt B (source_lang == target_lang) ────────────────────
+# ── Coherence Pass — Prompt B (source_lang == target_lang) ───────────────────
 
 async def run_coherence_pass(text: str, lang: str) -> str:
-    """Einsprachiges Lektorat: glättet Übergänge zwischen Sätzen/Absätzen.
-    Läuft über state.active_model (S1-Modellauswahl) — keine Übersetzung,
-    kein S2. Sprachagnostisch — der Sprachname wird per lang_name() zur
-    Laufzeit eingesetzt, kein Hardcoding auf Deutsch."""
+    """Monolingual editing pass: smooths transitions between sentences/paragraphs.
+    Runs over state.active_model (S1 model selection) — no translation,
+    no S2. Language-agnostic — the language name is inserted at runtime
+    via lang_name(), no hardcoding to German."""
     lang_display = lang_name(lang)
 
     prompt = (
@@ -121,18 +121,18 @@ async def run_coherence_pass(text: str, lang: str) -> str:
         except httpx.ConnectError:
             raise HTTPException(
                 status_code=503,
-                detail="Ollama nicht erreichbar. Läuft 'ollama serve'?",
+                detail="Ollama unreachable. Is 'ollama serve' running?",
             )
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Ollama Fehler: {e}")
+            raise HTTPException(status_code=500, detail=f"Ollama error: {e}")
 
-# ── S2 — Qualitäts-/Terminologie-Pass ────────────────────────────────────────
+# ── S2 — Quality/Terminology Pass ─────────────────────────────────────────────
 
 def _strip_code_blocks(text: str) -> str:
     return re.sub(r'```.*?```', '', text, flags=re.DOTALL)
 
 async def run_s2(text: str, s2_model: str, mindset: str = "general") -> str:
-    """Editiert, übersetzt nicht. Fällt still auf S1 zurück bei Fehler oder Drift."""
+    """Edits, does not translate. Silently falls back to S1 on error or drift."""
     ms    = MINDSETS.get(mindset, MINDSETS.get("general", {}))
     anchor = ms.get("anchor", "")
     veto   = ms.get("veto", [])
@@ -162,7 +162,7 @@ async def run_s2(text: str, s2_model: str, mindset: str = "general") -> str:
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=180.0)) as client:
         try:
-            # S1 aus VRAM entladen bevor S2 startet
+            # Unload S1 from VRAM before S2 starts
             await client.post(f"{OLLAMA_URL}/api/generate", json={
                 "model": state.active_model, "keep_alive": 0,
                 "prompt": "", "stream": False,
@@ -173,23 +173,23 @@ async def run_s2(text: str, s2_model: str, mindset: str = "general") -> str:
             if not result:
                 return text
 
-            # Drift-Check: S2 hat zurückübersetzt wenn non-ASCII-Anteil stark gestiegen
+            # Drift check: S2 translated back if the non-ASCII ratio rose sharply
             input_non_ascii  = sum(1 for c in _strip_code_blocks(text)   if ord(c) > 127) / max(len(_strip_code_blocks(text)),   1)
             output_non_ascii = sum(1 for c in _strip_code_blocks(result) if ord(c) > 127) / max(len(_strip_code_blocks(result)), 1)
             if output_non_ascii > input_non_ascii + 0.15:
-                return text  # Fallback auf S1
+                return text  # Fallback to S1
 
             return result
         except Exception:
-            return text  # S1-Ergebnis als Fallback
+            return text  # S1 result as fallback
 
-# ── Mindset-Erkennung ─────────────────────────────────────────────────────────
+# ── Mindset Detection ─────────────────────────────────────────────────────────
 
 async def detect_mindset(text: str, model: str = "") -> str:
-    """Klassifiziert Text per Ollama-Call. Gibt Mindset-Key zurück, Fallback 'general'.
+    """Classifies text via an Ollama call. Returns the mindset key, falls back to 'general'.
 
-    Modell-Priorität: explizit übergeben (Frontend-Dropdown) → config.yaml
-    pipeline_mindset_model → state.active_model (S1, alter Default-Ansatz).
+    Model priority: explicitly passed (frontend dropdown) → config.yaml
+    pipeline_mindset_model → state.active_model (S1, the old default approach).
     """
     if not text:
         return "general"
@@ -242,7 +242,7 @@ async def detect_mindset(text: str, model: str = "") -> str:
         except Exception:
             return "general"
 
-# ── Perf-Log-Wrapper ──────────────────────────────────────────────────────────
+# ── Perf-Log Wrapper ──────────────────────────────────────────────────────────
 
 def write_chunk_perf_log(
     chunk_index: int,
@@ -252,7 +252,7 @@ def write_chunk_perf_log(
     s2_model: str,
     terms_protected: int = 0,
 ) -> None:
-    """Übergibt state.active_model explizit an core.logging — kein State-Import dort."""
+    """Passes state.active_model explicitly to core.logging — no state import there."""
     try:
         _write_perf_log(
             chunk_index=chunk_index,

@@ -4,7 +4,7 @@ echo " LibreTranslate – Setup"
 echo " ----------------------"
 echo ""
 
-# Docker pruefen
+# Check Docker
 if ! command -v docker &> /dev/null; then
     echo " [ERROR] Docker not found."
     echo " Please install Docker: https://docs.docker.com/get-docker/"
@@ -18,7 +18,7 @@ echo ""
 docker pull libretranslate/libretranslate
 echo ""
 
-# Anwendungsfall auswaehlen
+# Select use case
 echo " Select your primary use case:"
 echo ""
 echo "  [1] DE <> EN only          (fast startup, ~300 MB)"
@@ -61,13 +61,13 @@ echo " Starting LibreTranslate to download language models..."
 echo " (First run downloads models — this may take several minutes)"
 echo ""
 
-# Sprachen speichern fuer start.sh
+# Save the languages for start.sh
 echo "$LANGS" > libretranslate_langs.txt
 
-# Alten Container entfernen
+# Remove the old container
 docker rm -f localtranslate-libre > /dev/null 2>&1
 
-# Starten
+# Start
 if [ -z "$LANGS" ]; then
     docker run --name localtranslate-libre -p 5000:5000 libretranslate/libretranslate
 else

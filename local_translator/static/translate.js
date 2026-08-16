@@ -1,26 +1,26 @@
-// ── translate.js — Übersetzungslogik ────────────────────────────────────────
+// ── translate.js — translation logic ────────────────────────────────────────
 //
-// Besitzt: translate, translateNow, stopTranslation, handleTranslateBtn,
+// Contains: translate, translateNow, stopTranslation, handleTranslateBtn,
 //          deeplFinal, libreFinal, mymemoryFinal, laraFinal
 //
-// Liest globalen State: config, isTranslating, abortController
-// Schreibt globalen State: isTranslating, abortController,
+// Reads global state: config, isTranslating, abortController
+// Writes global state: isTranslating, abortController,
 //                          currentTranslation, mindsetDetected
 //
-// Ruft auf: updateLaraUsage, updateVramStatus (engines.js)
+// Calls: updateLaraUsage, updateVramStatus (engines.js)
 //           showToast, renderDiffHTML (ui.js)
 //
-// Kohärenz-Modus (source_lang === target_lang): kein Block mehr — das
-// Backend läuft dann Prompt B statt Übersetzung (siehe app.py, engines/
-// ollama.py). Response kann zusätzlich "diff" + "similarity" enthalten
-// (core/diff_utils.py) — wird statt Klartext gerendert, mit Warnhinweis
-// bei niedriger Ähnlichkeit (siehe COHERENCE_WARNING_THRESHOLD unten).
+// Coherence Mode (source_lang === target_lang): no longer blocked — the
+// backend then runs Prompt B instead of translation (see app.py, engines/
+// ollama.py). The response may additionally contain "diff" + "similarity"
+// (core/diff_utils.py) — rendered instead of plain text, with a warning
+// at low similarity (see COHERENCE_WARNING_THRESHOLD below).
 //
-// HTML-onclick-Abhängigkeiten (müssen global verfügbar sein):
+// HTML onclick dependencies (must be globally available):
 //   handleTranslateBtn, deeplFinal, libreFinal, mymemoryFinal, laraFinal
 
 const CHUNK_LIMITS = { ollama: 6000, deepl: 4900, mymemory: 480 };
-const COHERENCE_WARNING_THRESHOLD = 0.6;   // difflib-Ratio — darunter: sichtbarer Warnhinweis
+const COHERENCE_WARNING_THRESHOLD = 0.6;   // difflib ratio — below this: visible warning
 
 async function translate(engine = 'ollama') {
   const text = document.getElementById('srcText').value.trim();
@@ -28,14 +28,15 @@ async function translate(engine = 'ollama') {
 
   const src = document.getElementById('srcLang').value;
   const tgt = document.getElementById('tgtLang').value;
-  // Kohärenz-Modus: src === tgt ist erlaubt (Prompt B im Backend übernimmt
-  // dann statt Übersetzung ein einsprachiges Lektorat) — kein Block mehr.
+  // Coherence Mode: src === tgt is allowed (Prompt B in the backend then
+  // takes over as a monolingual editing pass instead of translation) — no
+  // longer blocked.
   const coherenceMode = src === tgt;
 
-  // Mindset-Detect — erster Schritt, sobald eine Übersetzung tatsächlich
-  // startet (egal ob per Button, Enter oder Debounce-Timeout ausgelöst).
-  // Läuft nur einmal pro Übersetzungslauf (mindsetDetected-Flag), Reset
-  // passiert im finally-Block unten nach Abschluss.
+  // Mindset detection — first step as soon as a translation actually
+  // starts (regardless of whether triggered by button, Enter, or debounce
+  // timeout). Runs only once per translation run (mindsetDetected flag),
+  // reset happens in the finally block below once it's done.
   if (!mindsetDetected) {
     try {
       const mindsetModel = document.getElementById('mindsetModelSelect')?.value || '';
@@ -52,8 +53,8 @@ async function translate(engine = 'ollama') {
         if (aiLabel) aiLabel.textContent = `AI: ${data.mindset}`;
       }
     } catch {
-      // Mindset-Detect ist ein "Nice-to-have" - schlägt es fehl, läuft die
-      // Übersetzung trotzdem mit dem aktuell gewählten Mindset weiter.
+      // Mindset detection is a "nice-to-have" - if it fails, the
+      // translation still proceeds with the currently selected mindset.
     }
     mindsetDetected = true;
   }
@@ -78,7 +79,7 @@ async function translate(engine = 'ollama') {
 
   try {
     if (needsChunking) {
-      // ── Chunks vorbereiten ────────────────────────────────────────────────
+      // ── Prepare chunks ───────────────────────────────────────────────────
       const prepRes  = await fetch('/translate/chunks/prepare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,10 +91,10 @@ async function translate(engine = 'ollama') {
       const { chunks, total } = prepData;
       let context = '';
 
-      // Modelle vor Start entladen
+      // Unload models before starting
       await fetch('/ollama/unload', { method: 'POST' }).catch(() => {});
 
-      // Chunk-Tabelle aufbauen
+      // Build the chunk table
       out.className = 'output-area';
       out.innerHTML = '';
       const table   = document.createElement('table');
@@ -109,7 +110,7 @@ async function translate(engine = 'ollama') {
       });
       out.appendChild(table);
 
-      // ── Chunk-Loop ────────────────────────────────────────────────────────
+      // ── Chunk loop ────────────────────────────────────────────────────────
       for (let i = 0; i < chunks.length; i++) {
         const s2sel = document.getElementById('s2ModelSelect').value;
         document.getElementById('engineBadge').innerHTML =
@@ -134,7 +135,7 @@ async function translate(engine = 'ollama') {
         if (!res.ok) throw new Error(data.detail || 'Error');
 
         results.push(data.translation);
-        // letzter Absatz als Kontext für nächsten Chunk
+        // last paragraph as context for the next chunk
         const paras = data.translation.split('\n\n');
         context = paras[paras.length - 1].slice(-300);
 
@@ -158,7 +159,7 @@ async function translate(engine = 'ollama') {
       currentTranslation = results.join('\n\n');
 
     } else {
-      // ── Normaler Pfad — kein Chunking ─────────────────────────────────────
+      // ── Normal path — no chunking ───────────────────────────────────────
       await fetch('/ollama/unload', { method: 'POST' }).catch(() => {});
       const res = await fetch('/translate', {
         method: 'POST',
@@ -170,8 +171,8 @@ async function translate(engine = 'ollama') {
       if (!res.ok) throw new Error(data.detail || 'Error');
       currentTranslation = data.translation;
 
-      // Chunk-Tabelle darf nicht überschrieben werden — dieser Zweig läuft
-      // nur, wenn needsChunking von vornherein false war (siehe MAINTENANCE).
+      // The chunk table must not be overwritten — this branch only runs
+      // when needsChunking was false from the start (see MAINTENANCE).
       if (data.diff) {
         out.innerHTML = renderDiffHTML(data.diff);
         out.className = 'output-area';
@@ -184,7 +185,7 @@ async function translate(engine = 'ollama') {
 
     if (warnEl && coherenceMode && minSimilarity !== null && minSimilarity < COHERENCE_WARNING_THRESHOLD) {
       warnEl.textContent =
-        `⚠ Auffällig große Abweichung vom Original erkannt (Ähnlichkeit ${(minSimilarity * 100).toFixed(0)}%) — bitte sorgfältig prüfen.`;
+        `⚠ Noticeably large deviation from the original detected (similarity ${(minSimilarity * 100).toFixed(0)}%) — please review carefully.`;
       warnEl.style.display = '';
     }
 
@@ -216,8 +217,8 @@ async function translate(engine = 'ollama') {
     const mindsetSel     = document.getElementById('mindsetSelect');
     mindsetSel.disabled  = false;
     mindsetSel.value     = config.default_mindset || 'general';
-    // AI-Label bleibt stehen — wird erst bei clearAll() oder der nächsten
-    // erfolgreichen Detection (translate(), Anfang) überschrieben.
+    // The AI label stays in place — only cleared by clearAll() or overwritten
+    // by the next successful detection (translate(), start).
 
     if (engine === 'ollama') {
       fetch('/ollama/unload', { method: 'POST' })

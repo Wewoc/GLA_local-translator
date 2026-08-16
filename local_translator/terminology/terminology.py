@@ -1,14 +1,14 @@
 """
-terminology/terminology.py — Runtime Terminologie-Engine
+terminology/terminology.py — Runtime Terminology Engine
 
-Struktur:
+Structure:
   terminology/
     technical/de.json   {"§Txxxxxxxx§": "Betriebssystem"}
     technical/en.json   {"§Txxxxxxxx§": "Operating System"}
     legal/de.json + en.json
     ... (general, medical, editorial, academic, marketing, political)
 
-Neue Zielsprache: fr.json in den Mindset-Ordner legen — fertig.
+New target language: drop a new fr.json into the mindset folder — done.
 
 API:
   engine = TermEngine()
@@ -41,10 +41,10 @@ class TermEngine:
             cls._instance._cache: dict[tuple, dict] = {}
         return cls._instance
 
-    # ── Laden ─────────────────────────────────────────────────────────────────
+    # ── Loading ───────────────────────────────────────────────────────────────
 
     def _load(self, mindset: str, lang: str) -> dict:
-        """Lädt mindset/lang.json — nur einmal, dann gecacht. Gibt leeres Dict bei Fehler."""
+        """Loads mindset/lang.json — only once, then cached. Returns an empty dict on error."""
         key = (mindset, lang)
         if key in self._cache:
             return self._cache[key]
@@ -58,7 +58,7 @@ class TermEngine:
             self._cache[key] = {}
             return {}
         except Exception as e:
-            print(f"  [TermEngine] Ladefehler {json_path}: {e}")
+            print(f"  [TermEngine] Load error {json_path}: {e}")
             self._cache[key] = {}
             return {}
 
@@ -66,8 +66,8 @@ class TermEngine:
 
     def check(self, src_lang: str, tgt_lang: str, mindset: str) -> bool:
         """
-        Prüft ob Quell- und Zielsprache für das Mindset verfügbar sind.
-        Gibt True zurück wenn Engine aktiv, False wenn Fallback (Engine deaktiviert).
+        Checks whether the source and target language are available for the mindset.
+        Returns True if the engine is active, False if falling back (engine disabled).
         """
         src = self._load(mindset, src_lang.lower())
         tgt = self._load(mindset, tgt_lang.lower())
@@ -77,7 +77,7 @@ class TermEngine:
 
     def status(self, src_lang: str, tgt_lang: str, mindset: str) -> dict:
         """
-        Für den /terminology/status Endpoint und den UI-Indikator.
+        For the /terminology/status endpoint and the UI indicator.
         Returns:
           {
             "active": bool,
@@ -116,7 +116,7 @@ class TermEngine:
         mindset: str  = "general",
     ) -> tuple[str, dict]:
         """
-        Ersetzt Quellsprach-Terme durch Codes.
+        Replaces source-language terms with codes.
 
         Returns:
             (protected_text, code_map)
@@ -127,11 +127,11 @@ class TermEngine:
         if not src_data:
             return text, {}
 
-        # Invert: term_lower -> code  (für Regex-Matching)
+        # Invert: term_lower -> code  (for regex matching)
         term_to_code: dict[str, str] = {
             term.lower(): code for code, term in src_data.items()
         }
-        # Längste Terme zuerst -> kein Partial-Match
+        # Longest terms first -> no partial match
         sorted_terms = sorted(term_to_code.keys(), key=len, reverse=True)
 
         code_map: dict[str, dict] = {}
@@ -139,13 +139,13 @@ class TermEngine:
 
         for term_lower in sorted_terms:
             code = term_to_code[term_lower]
-            original_term = src_data[code]  # Originalschreibweise
+            original_term = src_data[code]  # original spelling
 
             base = re.escape(original_term)
-            # \b vor dem Term verhindert Matches mitten in Wörtern
-            # (z.B. "REST" in "underestimated", "NAL" in "external")
-            # Negativer Lookahead statt \b nach dem Term — Flexionsendungen
-            # (-e, -s, -es, -en, -n) werden direkt angehängt
+            # \b before the term prevents matches in the middle of words
+            # (e.g. "REST" in "underestimated", "NAL" in "external")
+            # Negative lookahead instead of \b after the term — inflection
+            # endings (-e, -s, -es, -en, -n) are appended directly
             flexions = [base, base+r"e", base+r"s", base+r"es", base+r"en", base+r"n"]
             pattern = re.compile(
                 r"\b(?:" + "|".join(flexions) + r")(?![a-zA-ZäöüÄÖÜ])",
@@ -172,8 +172,8 @@ class TermEngine:
         mindset: str   = "general",
     ) -> str:
         """
-        Ersetzt Codes durch Zielsprach-Terme.
-        Schlägt den Zielterm zur Laufzeit in tgt_lang.json nach.
+        Replaces codes with target-language terms.
+        Looks up the target term in tgt_lang.json at runtime.
         """
         if not code_map:
             return text
@@ -187,28 +187,28 @@ class TermEngine:
             if tgt_term:
                 result = result.replace(code, tgt_term)
 
-        # Reparatur beschädigter Codes (Leerzeichen, Großschreibung)
+        # Repair damaged codes (whitespace, capitalization)
         result = _repair(result, tgt_data)
         return result
 
     # ── verify ────────────────────────────────────────────────────────────────
 
     def verify(self, protected: str, restored: str, code_map: dict) -> list[str]:
-        """Gibt Warnmeldungen zurück — leer wenn alles ok."""
+        """Returns warning messages — empty if everything is ok."""
         issues = []
         for code in _CODE_PATTERN.findall(restored):
             if code in code_map:
-                issues.append(f"Code nicht ersetzt: {code} (src: '{code_map[code]['src']}')")
+                issues.append(f"Code not replaced: {code} (src: '{code_map[code]['src']}')")
         for code, info in code_map.items():
             if code in protected and code not in restored:
-                issues.append(f"Code verloren: {code} ('{info['src']}')")
+                issues.append(f"Code lost: {code} ('{info['src']}')")
         return issues
 
 
-# ── Hilfsfunktionen ───────────────────────────────────────────────────────────
+# ── Helper Functions ────────────────────────────────────────────────────────────
 
 def _repair(text: str, tgt_data: dict) -> str:
-    """Repariert § T1a2b3c4d §  (Leerzeichen) und ähnliche LLM-Beschädigungen."""
+    """Repairs § T1a2b3c4d §  (whitespace) and similar LLM damage."""
     loose = re.compile(r"§\s*T([0-9a-f]{8})\s*§", re.IGNORECASE)
     def normalize(m):
         canonical = f"§T{m.group(1).lower()}§"

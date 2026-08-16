@@ -1,18 +1,18 @@
 """
 LocalTranslate – FastAPI Backend
 
-Besitzt:
-  - FastAPI app-Instanz, Static-Mount, Index-Route
-  - Alle Pydantic Models
-  - Alle Endpoints
-  - __main__ Block mit Browser-Launch und uvicorn
+Contains:
+  - FastAPI app instance, static mount, index route
+  - All Pydantic models
+  - All endpoints
+  - __main__ block with browser launch and uvicorn
 
-Importiert aus diesem Projekt:
-  - core.config: state, Konstanten
+Imported from this project:
+  - core.config: state, constants
   - core.chunking: split_chunks, lang_name
   - core.logging: get_lara_usage
-  - core.diff_utils: compute_diff (nur Kohärenz-Modus)
-  # write_chunk_perf_log wird via engines.ollama aufgerufen — kein Direkt-Import
+  - core.diff_utils: compute_diff (Coherence Mode only)
+  # write_chunk_perf_log is called via engines.ollama — no direct import
   - engines.ollama: translate_ollama, run_coherence_pass, run_s2, detect_mindset, write_chunk_perf_log
   - engines.external: translate_deepl, translate_libretranslate,
                       translate_mymemory, translate_lara
@@ -130,7 +130,7 @@ class DetectMindsetRequest(BaseModel):
 class SetModelRequest(BaseModel):
     model: str
 
-# ── Endpoints — Konfiguration ─────────────────────────────────────────────────
+# ── Endpoints — Configuration ─────────────────────────────────────────────────
 
 @app.get("/config")
 async def get_config():
@@ -157,7 +157,7 @@ async def get_mindsets():
         for k, v in MINDSETS.items()
     }
 
-# ── Endpoints — Übersetzung ───────────────────────────────────────────────────
+# ── Endpoints — Translation ────────────────────────────────────────────────────
 
 @app.post("/translate/chunks/prepare")
 async def prepare_chunks(req: PrepareRequest):
@@ -188,16 +188,16 @@ async def translate_chunk(req: ChunkRequest):
     else:
         import time
 
-        # ── link_guard protect — außen um TermEngine, überlebt S1 + S2 ────────
+        # ── link_guard protect — wraps outside TermEngine, survives S1 + S2 ───
         link_result = link_guard.protect(req.text)
 
-        # ── protect vor S1 ───────────────────────────────────────────────────
+        # ── protect before S1 ─────────────────────────────────────────────────
         protected_text, code_map = term_engine.protect(
             link_result.protected_text, src_lang=req.source_lang, mindset=req.mindset
         )
 
-        # ── Kohärenz-Modus: source_lang == target_lang → Prompt B statt S1,
-        #    kein S2 (unabhängig von einem evtl. mitgeschickten s2_model) ──────
+        # ── Coherence Mode: source_lang == target_lang → Prompt B instead of S1,
+        #    no S2 (regardless of any s2_model that may have been sent) ────────
         coherence_mode = req.source_lang.upper() == req.target_lang.upper()
 
         t0 = time.monotonic()
@@ -210,7 +210,7 @@ async def translate_chunk(req: ChunkRequest):
         time_s1 = time.monotonic() - t0
         time_s2 = 0.0
 
-        # ── restore nach S1 — S2 bekommt sauberen Text ───────────────────────
+        # ── restore after S1 — S2 gets clean text ─────────────────────────────
         result = term_engine.restore(result, tgt_lang=req.target_lang,
                                      code_map=code_map, mindset=req.mindset)
         issues = term_engine.verify(protected_text, result, code_map)
@@ -218,21 +218,22 @@ async def translate_chunk(req: ChunkRequest):
             for issue in issues:
                 print(f"  [TermEngine] {issue}")
 
-        # ── S2 editiert auf restauriertem EN-Text — entfällt im Kohärenz-Modus ─
+        # ── S2 edits the restored EN text — skipped in Coherence Mode ──────────
         if req.s2_model and not coherence_mode:
             t1      = time.monotonic()
             result  = await run_s2(result, req.s2_model, req.mindset)
             time_s2 = time.monotonic() - t1
 
-        # ── link_guard restore — nach S1+S2, ganz am Ende ──────────────────────
+        # ── link_guard restore — after S1+S2, right at the end ─────────────────
         result = link_guard.restore(result, link_result.mapping)
         link_issues = link_guard.verify(result, link_result.mapping)
         if link_issues:
             for issue in link_issues:
                 print(f"  [LinkGuard] {issue}")
 
-        # ── Diff gegen Original — nur Kohärenz-Modus, dient als Review-Hilfe
-        #    und als sichtbare Warnschwelle (similarity) statt stillem Fallback ─
+        # ── Diff against the original — Coherence Mode only, serves as a review
+        #    aid and a visible warning threshold (similarity) instead of a silent
+        #    fallback ─────────────────────────────────────────────────────────
         if coherence_mode:
             diff_result = compute_diff(req.text, result)
 
@@ -322,7 +323,7 @@ async def ollama_status():
 
 @app.get("/ollama/vram")
 async def ollama_vram():
-    """Geladene Modelle + VRAM aus /api/ps. Optional: GPU-Gesamt via nvidia-smi."""
+    """Loaded models + VRAM from /api/ps. Optional: total GPU usage via nvidia-smi."""
     import subprocess
     loaded = []
     vram_used_bytes = 0
@@ -359,7 +360,7 @@ async def ollama_vram():
 
 @app.post("/ollama/unload")
 async def ollama_unload():
-    """Alle geladenen Modelle aus VRAM entladen."""
+    """Unload all loaded models from VRAM."""
     async with httpx.AsyncClient(timeout=3.0) as client:
         try:
             r      = await client.get(f"{OLLAMA_URL}/api/ps")
@@ -386,7 +387,7 @@ async def set_model(req: SetModelRequest):
     state.active_model = req.model
     return {"model": state.active_model}
 
-# ── Endpoints — Mindset ───────────────────────────────────────────────────────
+# ── Endpoints — Mindset ────────────────────────────────────────────────────────
 
 @app.post("/mindset/detect")
 async def detect_mindset_endpoint(req: DetectMindsetRequest):
@@ -404,7 +405,7 @@ async def lara_usage():
         "remaining":   max(0, LARA_DAILY_LIMIT - usage["chars"]),
     }
 
-# ── Endpoints — Terminologie ──────────────────────────────────────────────────
+# ── Endpoints — Terminology ────────────────────────────────────────────────────
 
 @app.get("/terminology/status")
 async def terminology_status(
@@ -518,5 +519,5 @@ if __name__ == "__main__":
                     time.sleep(0.5)
         Thread(target=_open_when_ready, daemon=True).start()
 
-    print(f"\n  LocalTranslate läuft auf http://{HOST}:{PORT}\n")
+    print(f"\n  LocalTranslate is running on http://{HOST}:{PORT}\n")
     uvicorn.run(app, host=HOST, port=PORT, log_level="warning")

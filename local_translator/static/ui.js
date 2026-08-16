@@ -1,13 +1,13 @@
-// ── ui.js — UI-Hilfsfunktionen ──────────────────────────────────────────────
+// ── ui.js — UI helper functions ─────────────────────────────────────────────
 //
-// Besitzt: showToast, clearAll, copyTranslation, exportMD, openExportDir,
+// Contains: showToast, clearAll, copyTranslation, exportMD, openExportDir,
 //          updateCharCount, swapLangs, updatePipelineGray, isCoherenceMode,
 //          updateCoherenceUI, renderDiffHTML
 //
-// Liest globalen State: config, currentTranslation
-// Schreibt globalen State: currentTranslation, mindsetDetected (nur clearAll)
-// Ruft auf: checkLibre() aus engines.js (swapLangs, updateCoherenceUI — ok,
-//           da Click-/Change-Event); updateCharCount (updateCoherenceUI)
+// Reads global state: config, currentTranslation
+// Writes global state: currentTranslation, mindsetDetected (clearAll only)
+// Calls: checkLibre() from engines.js (swapLangs, updateCoherenceUI — ok,
+//           since click/change event); updateCharCount (updateCoherenceUI)
 
 function showToast(msg, type = '') {
   const t = document.getElementById('toast');
@@ -109,12 +109,12 @@ function updatePipelineGray() {
   });
 }
 
-// ── Kohärenz-Modus — Status + Diff-Rendering ────────────────────────────────
+// ── Coherence Mode — status + diff rendering ────────────────────────────────
 //
-// Aktiv, wenn source_lang === target_lang: Backend läuft dann Prompt B
-// (einsprachiges Lektorat) statt Übersetzung, siehe engines/ollama.py
-// run_coherence_pass(). S2 und externe Engines ergeben in diesem Fall
-// keinen Sinn und werden hier gesperrt.
+// Active when source_lang === target_lang: the backend then runs Prompt B
+// (monolingual editing) instead of translation, see engines/ollama.py
+// run_coherence_pass(). S2 and external engines don't make sense in this
+// case and are locked here.
 
 function isCoherenceMode() {
   return document.getElementById('srcLang').value === document.getElementById('tgtLang').value;
@@ -135,9 +135,9 @@ function updateCoherenceUI() {
   const laraBtn = document.getElementById('laraBtn');
   if (laraBtn) laraBtn.disabled = active ? true : !config.lara_available;
 
-  // MyMemory/LibreTranslate haben eigene reaktive Status-Funktionen —
-  // im Kohärenz-Modus nur hart sperren, beim Verlassen deren eigene Logik
-  // erneut aufrufen statt sie hier zu duplizieren (Single Owner).
+  // MyMemory/LibreTranslate have their own reactive status functions —
+  // in Coherence Mode just hard-lock them, and call their own logic again
+  // when leaving instead of duplicating it here (Single Owner).
   const mmBtn = document.getElementById('mymemoryBtn');
   if (mmBtn) {
     if (active) mmBtn.disabled = true;

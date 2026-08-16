@@ -1,8 +1,8 @@
 @echo off
-title Terminologie-Engine — Validierung
+title Terminologie-Engine — Validation
 echo.
-echo  Terminologie-Engine — Pass 3 Uebersetzungsvalidierung
-echo  Modell: aya-expanse:latest
+echo  Terminologie-Engine — Pass 3 translation validation
+echo  Model: aya-expanse:latest
 echo.
 
 cd /d "%~dp0"

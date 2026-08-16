@@ -38,16 +38,16 @@ from pathlib import Path
 try:
     from lxml import etree
 except ImportError:
-    print("[FEHLER] lxml nicht installiert. Bitte: pip install lxml")
+    print("[ERROR] lxml not installed. Please: pip install lxml")
     sys.exit(1)
 
-# ── Konfiguration ─────────────────────────────────────────────────────────────
+# ── Configuration ─────────────────────────────────────────────────────────────
 
-# BLOCKLIST_PATTERNS — auf DE- UND EN-Term geprüft, Eintrag fliegt raus bei Treffer.
-#   r"^\w{1,3}$"    zu kurz. Auf r"^\w{1,2}$" kürzen um API/CPU/SQL zu behalten.
-#   r"^\d+"         beginnt mit Ziffer
-#   r"^\(.*\)$"     komplett in Klammern, z.B. "( Intellekt )" — kein echter Term
-#   r"^(...)$"      Alltagswörter die durch das Längen-Muster rutschen
+# BLOCKLIST_PATTERNS — checked against both the DE and EN term, entry is dropped on match.
+#   r"^\w{1,3}$"    too short. Shorten to r"^\w{1,2}$" to keep API/CPU/SQL.
+#   r"^\d+"         starts with a digit
+#   r"^\(.*\)$"     entirely in parentheses, e.g. "( Intellekt )" — not a real term
+#   r"^(...)$"      everyday words that slip through the length pattern
 BLOCKLIST_PATTERNS = [
     r"^\w{1,3}$",
     r"^\d+",
@@ -56,14 +56,14 @@ BLOCKLIST_PATTERNS = [
 ]
 
 # IATE_MIN_RELIABILITY
-#   "Very reliable"              -> 4  (EU-Rechtsakte, offiziell validiert)
-#   "Reliable"                   -> 3  (von Experten geprüft)  <- Standard
-#   "Minimum reliability"        -> 1  (eingereicht, nicht geprüft)
+#   "Very reliable"              -> 4  (EU legal acts, officially validated)
+#   "Reliable"                   -> 3  (expert-reviewed)  <- default
+#   "Minimum reliability"        -> 1  (submitted, not reviewed)
 #   "Reliability not verified"   -> 0
 IATE_MIN_RELIABILITY = 3
 
-# GENERAL_MIN_DOMAINS — Wie viele Mindset-Domains ein Begriff abdecken muss
-# um als domänenübergreifend (general.json) zu gelten statt in Einzellisten.
+# GENERAL_MIN_DOMAINS — how many mindset domains a term must cover
+# to count as cross-domain (general.json) instead of going into individual lists.
 GENERAL_MIN_DOMAINS = 3
 
 # ── Domain -> Mindset Mapping ─────────────────────────────────────────────────
@@ -131,18 +131,18 @@ DOMAIN_TO_MINDSET = [
 ALL_MINDSETS = ["general", "technical", "legal", "medical",
                 "editorial", "academic", "marketing", "political"]
 
-# ── Code-Generierung ──────────────────────────────────────────────────────────
+# ── Code Generation ──────────────────────────────────────────────────────────
 
 def make_code(de_term: str, mindset: str) -> str:
     """
-    Stabiler Code aus DE-Term + Mindset — gleicher Input ergibt immer denselben Code.
-    Format: §Txxxxxxxx§  (8 Hex-Zeichen aus MD5, Kollisionswahrscheinlichkeit vernachlässigbar)
-    Vorteil: Codes sind build-stabil, kein Index nötig.
+    Stable code derived from the DE term + mindset — same input always yields the same code.
+    Format: §Txxxxxxxx§  (8 hex characters from MD5, collision probability negligible)
+    Benefit: codes are build-stable, no index needed.
     """
     h = hashlib.md5(f"{mindset}:{de_term.lower()}".encode()).hexdigest()[:8]
     return f"§T{h}§"
 
-# ── Domain-Klassifikation ─────────────────────────────────────────────────────
+# ── Domain Classification ─────────────────────────────────────────────────────
 
 def classify_domains(domains_raw: str) -> set:
     mindsets = set()
@@ -155,7 +155,7 @@ def classify_domains(domains_raw: str) -> set:
 # ── TBX Parser ────────────────────────────────────────────────────────────────
 
 def parse_mtc_tbx(path):
-    print(f"  Lese MTC TBX: {path.name} ...")
+    print(f"  Reading MTC TBX: {path.name} ...")
     for enc in ("utf-8-sig", "utf-8", "utf-16"):
         try:
             content = path.read_bytes().decode(enc)
@@ -163,13 +163,13 @@ def parse_mtc_tbx(path):
         except Exception:
             continue
     else:
-        print("  [FEHLER] Encoding nicht erkannt")
+        print("  [ERROR] Encoding not recognized")
         return []
 
     try:
         root = etree.fromstring(content.encode("utf-8"))
     except Exception as e:
-        print(f"  [FEHLER] Parse-Fehler: {e}")
+        print(f"  [ERROR] Parse error: {e}")
         return []
 
     XML_LANG_ATTRS = (
@@ -207,12 +207,12 @@ def parse_mtc_tbx(path):
             results.append({"de": terms["de"], "en": terms["en"],
                             "source": "mtc", "domains": set()})
 
-    print(f"  -> {len(results)} DE/EN-Paare")
+    print(f"  -> {len(results)} DE/EN pairs")
     return results
 
 
 def parse_iate_csv(path):
-    print(f"  Lese IATE CSV: {path.name} ...")
+    print(f"  Reading IATE CSV: {path.name} ...")
     RELIABILITY_MAP = {
         "very reliable": 4, "reliable": 3,
         "minimum reliability": 1, "reliability not verified": 0,
@@ -226,7 +226,7 @@ def parse_iate_csv(path):
         except UnicodeDecodeError:
             continue
     else:
-        print("  [FEHLER] Encoding nicht erkannt")
+        print("  [ERROR] Encoding not recognized")
         return []
 
     groups = {}
@@ -268,9 +268,9 @@ def parse_iate_csv(path):
                 "source": "iate", "domains": classify_domains(data.get("domains", "")),
             })
 
-    print(f"  -> {len(results)} DE/EN-Paare (min. Zuverlaessigkeit {IATE_MIN_RELIABILITY})")
+    print(f"  -> {len(results)} DE/EN pairs (min. reliability {IATE_MIN_RELIABILITY})")
     if errors:
-        print(f"  -> {errors} Zeilen uebersprungen")
+        print(f"  -> {errors} rows skipped")
     return results
 
 # ── Filter & Dedup ────────────────────────────────────────────────────────────
@@ -310,7 +310,7 @@ def assign_mindsets(entries):
                     buckets[m].append(e)
     return buckets
 
-# ── Ollama-Filter ─────────────────────────────────────────────────────────────
+# ── Ollama Filter ─────────────────────────────────────────────────────────────
 
 def ollama_filter_batch(entries, mindset, model, host, batch_size=30):
     if not entries:
@@ -322,7 +322,7 @@ def ollama_filter_batch(entries, mindset, model, host, batch_size=30):
         "marketing": "advertising and business", "political": "policy and government",
     }
     import urllib.request
-    print(f"  Ollama-Filter [{mindset}]: {len(entries)} Eintraege ...")
+    print(f"  Ollama filter [{mindset}]: {len(entries)} entries ...")
     kept, skipped = [], 0
     total = (len(entries) + batch_size - 1) // batch_size
 
@@ -354,23 +354,23 @@ def ollama_filter_batch(entries, mindset, model, host, batch_size=30):
                 for idx in sorted(indices):
                     kept.append(batch[idx])
                 skipped += len(batch) - len(indices)
-            print(f"    Batch {bn}/{total}: {len(indices)} behalten")
+            print(f"    Batch {bn}/{total}: {len(indices)} kept")
             time.sleep(0.1)
         except Exception as ex:
             print(f"    [WARN] Batch {bn}: {ex}")
             kept.extend(batch)
 
-    print(f"  -> [{mindset}] {len(kept)} behalten, {skipped} gefiltert")
+    print(f"  -> [{mindset}] {len(kept)} kept, {skipped} filtered")
     return kept
 
-# ── Ausgabe ───────────────────────────────────────────────────────────────────
+# ── Output ────────────────────────────────────────────────────────────────────
 
 def write_mindset_files(entries, mindset_dir: Path, mindset: str) -> int:
     """
-    Schreibt de.json und en.json in den Mindset-Ordner.
+    Writes de.json and en.json into the mindset folder.
 
-    Format: {"§Txxxxxxxx§": "Begriff"}
-    Codes sind hash-basiert und damit build-stabil.
+    Format: {"§Txxxxxxxx§": "term"}
+    Codes are hash-based and therefore build-stable.
     """
     mindset_dir.mkdir(parents=True, exist_ok=True)
     de_map = {}
@@ -388,79 +388,79 @@ def write_mindset_files(entries, mindset_dir: Path, mindset: str) -> int:
 
     return len(de_map)
 
-# ── Hauptfunktion ─────────────────────────────────────────────────────────────
+# ── Main Function ─────────────────────────────────────────────────────────────
 
 def build(mtc_path, iate_path, output_dir, use_ollama, ollama_model, ollama_host):
     output_dir.mkdir(parents=True, exist_ok=True)
     all_entries = []
 
-    print("\n[1] Quellen einlesen")
+    print("\n[1] Reading sources")
     if mtc_path and mtc_path.exists():
         all_entries.extend(parse_mtc_tbx(mtc_path))
     elif mtc_path:
-        print(f"  [WARN] nicht gefunden: {mtc_path}")
+        print(f"  [WARN] not found: {mtc_path}")
     if iate_path and iate_path.exists():
         all_entries.extend(parse_iate_csv(iate_path))
     elif iate_path:
-        print(f"  [WARN] nicht gefunden: {iate_path}")
+        print(f"  [WARN] not found: {iate_path}")
     if not all_entries:
-        print("[FEHLER] Keine Eintraege geladen.")
+        print("[ERROR] No entries loaded.")
         sys.exit(1)
-    print(f"  -> Gesamt: {len(all_entries)}")
+    print(f"  -> Total: {len(all_entries)}")
     stats = {"raw": len(all_entries)}
 
-    print("\n[2] Heuristischer Filter")
+    print("\n[2] Heuristic filter")
     before = len(all_entries)
     all_entries = [e for e in all_entries if not is_trivial(e["de"], e["en"])]
     stats["after_heuristic"] = len(all_entries)
-    print(f"  -> {before - len(all_entries)} entfernt, {len(all_entries)} verbleiben")
+    print(f"  -> {before - len(all_entries)} removed, {len(all_entries)} remaining")
 
-    print("\n[3] Deduplizierung")
+    print("\n[3] Deduplication")
     before = len(all_entries)
     all_entries = deduplicate(all_entries)
     stats["after_dedup"] = len(all_entries)
-    print(f"  -> {before - len(all_entries)} Duplikate entfernt, {len(all_entries)} verbleiben")
+    print(f"  -> {before - len(all_entries)} duplicates removed, {len(all_entries)} remaining")
 
-    print("\n[4] Mindset-Zuweisung")
+    print("\n[4] Mindset assignment")
     buckets = assign_mindsets(all_entries)
     for m in ALL_MINDSETS:
-        print(f"  {m:12} -> {len(buckets[m]):>6} Eintraege")
+        print(f"  {m:12} -> {len(buckets[m]):>6} entries")
 
     if use_ollama:
-        print("\n[5] Ollama-Filter (pro Mindset)")
+        print("\n[5] Ollama filter (per mindset)")
         for m in ALL_MINDSETS:
             buckets[m] = ollama_filter_batch(buckets[m], m, ollama_model, ollama_host)
     else:
-        print("\n[5] Ollama-Filter uebersprungen (--filter nicht gesetzt)")
+        print("\n[5] Ollama filter skipped (--filter not set)")
 
-    print("\n[6] Ausgabe")
+    print("\n[6] Output")
     final_counts = {}
     for m in ALL_MINDSETS:
         mindset_dir = output_dir / m
         count = write_mindset_files(buckets[m], mindset_dir, m)
         final_counts[m] = count
-        print(f"  -> {m}/de.json + en.json ({count} Eintraege)")
+        print(f"  -> {m}/de.json + en.json ({count} entries)")
 
     report = [
         "# build_terminology -- Report",
-        f"Erstellt:             {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Created:              {time.strftime('%Y-%m-%d %H:%M:%S')}",
         f"MTC:                  {mtc_path}",
         f"IATE:                 {iate_path}",
-        f"Ollama-Filter:        {'ja -- ' + ollama_model if use_ollama else 'nein'}",
+        f"Ollama filter:        {'yes -- ' + ollama_model if use_ollama else 'no'}",
         f"IATE_MIN_RELIABILITY: {IATE_MIN_RELIABILITY}",
         f"GENERAL_MIN_DOMAINS:  {GENERAL_MIN_DOMAINS}",
-        f"Code-Format:          hash-basiert (stabil ueber Builds)",
+        f"Code format:          hash-based (stable across builds)",
         "",
         "## Pipeline",
         f"  Raw:              {stats['raw']}",
-        f"  Nach Heuristik:   {stats['after_heuristic']}",
-        f"  Nach Dedup:       {stats['after_dedup']}",
+        f"  After heuristic:  {stats['after_heuristic']}",
+        f"  After dedup:      {stats['after_dedup']}",
         "",
-        "## Mindset-Listen",
+        "## Mindset Lists",
     ] + [f"  {m:12} {final_counts[m]:>6}" for m in ALL_MINDSETS] + [
-        f"  {'GESAMT':12} {sum(final_counts.values()):>6}",
+        f"  {'TOTAL':12} {sum(final_counts.values()):>6}",
         "",
-        "## Stichprobe technical/de.json (erste 10)",
+        "## Sample technical/de.json (first 10)",
     ] + [
         f"  {make_code(e['de'], 'technical')}  {e['de']} -> {e['en']}"
         for e in sorted(buckets["technical"], key=lambda e: e["de"].lower())[:10]
@@ -468,7 +468,7 @@ def build(mtc_path, iate_path, output_dir, use_ollama, ollama_model, ollama_host
 
     (output_dir / "build_report.txt").write_text("\n".join(report), encoding="utf-8")
     print(f"  -> build_report.txt")
-    print(f"\nBuild abgeschlossen -- {sum(final_counts.values())} Eintraege in {len(ALL_MINDSETS)} Listen")
+    print(f"\nBuild complete -- {sum(final_counts.values())} entries in {len(ALL_MINDSETS)} lists")
 
 
 if __name__ == "__main__":
@@ -481,5 +481,5 @@ if __name__ == "__main__":
     parser.add_argument("--host",   default="http://localhost:11434")
     args = parser.parse_args()
     if not args.mtc and not args.iate:
-        parser.error("Mindestens --mtc oder --iate muss angegeben werden")
+        parser.error("At least --mtc or --iate must be specified")
     build(args.mtc, args.iate, args.out, args.filter, args.model, args.host)

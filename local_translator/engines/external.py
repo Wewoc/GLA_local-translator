@@ -1,18 +1,18 @@
 """
-engines/external.py — Externe Übersetzungs-Engines
+engines/external.py — External translation engines
 
-Besitzt:
+Contains:
   - translate_deepl()
   - translate_libretranslate()
   - translate_mymemory()
   - translate_lara()
 
-Importiert:
+Imports:
   - httpx, fastapi.HTTPException
-  - core.config: Credentials und Engine-Flags
+  - core.config: credentials and engine flags
   - core.logging: add_lara_usage
 
-Wird importiert von: app.py
+Imported by: app.py
 """
 
 import httpx
@@ -37,7 +37,7 @@ async def translate_deepl(text: str, source_lang: str, target_lang: str) -> str:
     if not DEEPL_KEY:
         raise HTTPException(
             status_code=400,
-            detail="Kein DeepL API Key in config.yaml eingetragen.",
+            detail="No DeepL API key configured in config.yaml.",
         )
     base = "https://api-free.deepl.com" if DEEPL_FREE else "https://api.deepl.com"
     url  = f"{base}/v2/translate"
@@ -53,15 +53,15 @@ async def translate_deepl(text: str, source_lang: str, target_lang: str) -> str:
             r.raise_for_status()
             return r.json()["translations"][0]["text"]
         except httpx.HTTPStatusError as e:
-            raise HTTPException(status_code=502, detail=f"DeepL Fehler: {e.response.text}")
+            raise HTTPException(status_code=502, detail=f"DeepL error: {e.response.text}")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"DeepL Fehler: {e}")
+            raise HTTPException(status_code=500, detail=f"DeepL error: {e}")
 
 # ── LibreTranslate ────────────────────────────────────────────────────────────
 
 async def translate_libretranslate(text: str, source_lang: str, target_lang: str) -> str:
     if not LIBRE_ON:
-        raise HTTPException(status_code=400, detail="LibreTranslate nicht aktiviert.")
+        raise HTTPException(status_code=400, detail="LibreTranslate not enabled.")
     payload: dict = {
         "q":      text,
         "source": source_lang.lower(),
@@ -76,15 +76,15 @@ async def translate_libretranslate(text: str, source_lang: str, target_lang: str
             r.raise_for_status()
             return r.json().get("translatedText", "").strip()
         except httpx.ConnectError:
-            raise HTTPException(status_code=503, detail="LibreTranslate nicht erreichbar.")
+            raise HTTPException(status_code=503, detail="LibreTranslate unreachable.")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"LibreTranslate Fehler: {e}")
+            raise HTTPException(status_code=500, detail=f"LibreTranslate error: {e}")
 
 # ── MyMemory ──────────────────────────────────────────────────────────────────
 
 async def translate_mymemory(text: str, source_lang: str, target_lang: str) -> str:
     if not MYMEMORY_ON:
-        raise HTTPException(status_code=400, detail="MyMemory nicht aktiviert.")
+        raise HTTPException(status_code=400, detail="MyMemory not enabled.")
     params: dict = {
         "q":        text,
         "langpair": f"{source_lang.upper()}|{target_lang.upper()}",
@@ -99,19 +99,19 @@ async def translate_mymemory(text: str, source_lang: str, target_lang: str) -> s
             if data.get("responseStatus") != 200:
                 raise HTTPException(
                     status_code=502,
-                    detail=f"MyMemory: {data.get('responseDetails', 'Fehler')}",
+                    detail=f"MyMemory: {data.get('responseDetails', 'Error')}",
                 )
             return data["responseData"]["translatedText"].strip()
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"MyMemory Fehler: {e}")
+            raise HTTPException(status_code=500, detail=f"MyMemory error: {e}")
 
 # ── Lara ──────────────────────────────────────────────────────────────────────
 
 async def translate_lara(text: str, source_lang: str, target_lang: str) -> str:
     if not LARA_ID or not LARA_SECRET:
-        raise HTTPException(status_code=400, detail="Lara Credentials fehlen in .env.")
+        raise HTTPException(status_code=400, detail="Lara credentials missing in .env.")
     try:
         import asyncio
         from lara_sdk import Credentials, Translator
@@ -128,7 +128,7 @@ async def translate_lara(text: str, source_lang: str, target_lang: str) -> str:
     except ImportError:
         raise HTTPException(
             status_code=500,
-            detail="lara-sdk nicht installiert. Bitte 'pip install lara-sdk' ausführen.",
+            detail="lara-sdk not installed. Please run 'pip install lara-sdk'.",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lara Fehler: {e}")
+        raise HTTPException(status_code=500, detail=f"Lara error: {e}")

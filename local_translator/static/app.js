@@ -1,15 +1,15 @@
-// ── app.js — Globaler State, Init, Input-Setup ──────────────────────────────
+// ── app.js — global state, init, input setup ────────────────────────────────
 //
-// Besitzt: globaler State (6 Variablen), init(), setupInput()
+// Contains: global state (6 variables), init(), setupInput()
 //
-// Liest globalen State: alle
-// Schreibt globalen State: config (initiales Befüllen), debounceTimer, mindsetDetected
+// Reads global state: all
+// Writes global state: config (initial fill), debounceTimer, mindsetDetected
 //
-// Ruft auf: Funktionen aus ui.js, engines.js, translate.js
+// Calls: functions from ui.js, engines.js, translate.js
 //
-// Muss als letztes Script geladen werden — init() setzt alle anderen voraus.
+// Must be loaded as the last script — init() assumes all others are present.
 
-// ── Globaler State ───────────────────────────────────────────────────────────
+// ── Global State ──────────────────────────────────────────────────────────────
 
 let config = {};
 let debounceTimer = null;
@@ -23,7 +23,7 @@ let mindsetDetected = false;
 async function init() {
   config = await fetch('/config').then(r => r.json());
 
-  // Sprach-Dropdowns befüllen
+  // Fill language dropdowns
   ['srcLang', 'tgtLang'].forEach(id => {
     const sel = document.getElementById(id);
     Object.entries(config.languages).forEach(([name, code]) => {
@@ -37,7 +37,7 @@ async function init() {
   document.getElementById('tgtLang').value   = config.default_target_lang;
   document.getElementById('modeSelect').value = config.default_mode || 'debounce';
 
-  // Mindset-Dropdown befüllen
+  // Fill mindset dropdown
   const mindsetSel = document.getElementById('mindsetSelect');
   Object.entries(config.mindsets || {}).forEach(([key, label]) => {
     const opt = document.createElement('option');
@@ -47,7 +47,7 @@ async function init() {
   });
   mindsetSel.value = config.default_mindset || 'general';
 
-  // Final-Pass Buttons
+  // Final-pass buttons
   document.getElementById('deeplBtn').disabled = !config.deepl_available;
 
   if (config.libretranslate_available) checkLibre();
@@ -60,11 +60,11 @@ async function init() {
   document.getElementById('laraBtn').disabled = !config.lara_available;
   if (config.lara_available) updateLaraUsage();
 
-  // VRAM-Status
+  // VRAM status
   updateVramStatus();
   setInterval(updateVramStatus, 10000);
 
-  // Sprach-Dropdowns → LibreTranslate-Status + Kohärenz-Modus-UI
+  // Language dropdowns → LibreTranslate status + Coherence Mode UI
   document.getElementById('srcLang').addEventListener('change', () => {
     if (config.libretranslate_available) checkLibre();
     checkTerminology();
@@ -81,20 +81,20 @@ async function init() {
   checkTerminology();
   updateCoherenceUI();
 
-  // Ollama-Status
+  // Ollama status
   checkOllama();
   setInterval(checkOllama, 30000);
 
   setupInput();
 }
 
-// ── Input-Setup ───────────────────────────────────────────────────────────────
+// ── Input Setup ──────────────────────────────────────────────────────────────
 
 function setupInput() {
   const ta  = document.getElementById('srcText');
   const out = document.getElementById('tgtOutput');
 
-  // Synchronisiertes Scrollen
+  // Synchronized scrolling
   ta.addEventListener('scroll', () => {
     const ratio = ta.scrollTop / (ta.scrollHeight - ta.clientHeight || 1);
     out.scrollTop = ratio * (out.scrollHeight - out.clientHeight);
@@ -104,10 +104,10 @@ function setupInput() {
     ta.scrollTop = ratio * (ta.scrollHeight - ta.clientHeight);
   });
 
-  // Übersetzung im Debounce-Modus. Mindset-Detect passiert NICHT hier mehr
-  // (siehe translate.js) - es soll erst laufen, wenn eine Übersetzung
-  // tatsächlich startet, egal über welchen Trigger (Button/Enter/Debounce),
-  // nicht bei jedem einzelnen Tastendruck unabhängig vom gewählten Modus.
+  // Translation in debounce mode. Mindset detection no longer happens here
+  // (see translate.js) - it should only run once a translation actually
+  // starts, regardless of which trigger (button/Enter/debounce),
+  // not on every single keystroke regardless of the selected mode.
   ta.addEventListener('input', () => {
     updateCharCount('srcText', 'srcCount');
 
@@ -120,7 +120,7 @@ function setupInput() {
     }
   });
 
-  // Sentence-Modus
+  // Sentence mode
   ta.addEventListener('keydown', (e) => {
     const mode = document.getElementById('modeSelect').value;
     if (mode === 'sentence' && e.key === 'Enter' && !e.shiftKey) {
@@ -128,5 +128,3 @@ function setupInput() {
     }
   });
 }
-
-init();

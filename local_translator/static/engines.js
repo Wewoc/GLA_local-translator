@@ -1,14 +1,14 @@
-// ── engines.js — Engine-Status und Modell-Verwaltung ────────────────────────
+// ── engines.js — engine status and model management ─────────────────────────
 //
-// Besitzt: checkOllama, updateVramStatus, setModel,
+// Contains: checkOllama, updateVramStatus, setModel,
 //          checkLibre, stopLibre, updateLaraUsage
 //
-// Liest globalen State: config
-// Schreibt globalen State: config.ollama_model (setModel)
-// Ruft auf: showToast (ui.js), updatePipelineGray (ui.js)
+// Reads global state: config
+// Writes global state: config.ollama_model (setModel)
+// Calls: showToast (ui.js), updatePipelineGray (ui.js)
 //
-// HTML-onchange-Abhängigkeiten:
-//   setModel via onchange="setModel(this.value)" → muss global verfügbar sein
+// HTML onchange dependencies:
+//   setModel via onchange="setModel(this.value)" → must be globally available
 
 async function checkOllama() {
   const dot   = document.getElementById('ollamaDot');
@@ -30,7 +30,7 @@ async function checkOllama() {
       });
       if (!sel.value && s.models.length) sel.value = s.models[0];
 
-      // S2- und Mindset-Dropdown mit derselben Modellliste befüllen
+      // Fill the S2 and mindset dropdowns with the same model list
       ['s2ModelSelect', 'mindsetModelSelect'].forEach(id => {
         const sel  = document.getElementById(id);
         const prev = sel.value;

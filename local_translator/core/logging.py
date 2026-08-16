@@ -1,15 +1,15 @@
 """
-core/logging.py — Performance-Log und Lara-Nutzungszähler
+core/logging.py — performance log and Lara usage counter
 
-Besitzt:
+Contains:
   - _ensure_perf_log(), _write_perf_log()
   - get_lara_usage(), add_lara_usage()
 
-Importiert: core.config (Pfade, Konstanten)
-Wird importiert von: engines/ollama.py (perf log), app.py (lara usage endpoint)
+Imports: core.config (paths, constants)
+Imported by: engines/ollama.py (perf log), app.py (lara usage endpoint)
 
-Hinweis: _write_perf_log() bekommt active_model als expliziten Parameter —
-  keine Abhängigkeit auf RuntimeState, logging bleibt vollständig unabhängig.
+Note: _write_perf_log() receives active_model as an explicit parameter —
+  no dependency on RuntimeState, logging stays fully independent.
 """
 
 import json
@@ -17,7 +17,7 @@ from datetime import datetime
 
 from core.config import CSV_SEP, LARA_DAILY_LIMIT, LARA_USAGE_FILE, PERF_LOG
 
-# ── Performance-Log ───────────────────────────────────────────────────────────
+# ── Performance Log ───────────────────────────────────────────────────────────
 
 def _ensure_perf_log() -> None:
     if not PERF_LOG.exists():
@@ -38,7 +38,7 @@ def _write_perf_log(
     model_s2: str,
     terms_protected: int = 0,
 ) -> None:
-    """active_model wird als expliziter Parameter übergeben — kein State-Import."""
+    """active_model is passed as an explicit parameter — no state import."""
     complexity = "low" if chunk_size < 2000 else "medium" if chunk_size < 4000 else "high"
     _ensure_perf_log()
     with open(PERF_LOG, "a", encoding="utf-8") as f:
@@ -54,7 +54,7 @@ def _write_perf_log(
             str(terms_protected),
         ]) + "\n")
 
-# ── Lara-Nutzungszähler ───────────────────────────────────────────────────────
+# ── Lara Usage Counter ────────────────────────────────────────────────────────
 
 def get_lara_usage() -> dict:
     today = datetime.now().strftime("%Y-%m-%d")

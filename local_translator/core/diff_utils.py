@@ -1,14 +1,14 @@
 """
-core/diff_utils.py — Wort-Diff für den Kohärenz-Pass
+core/diff_utils.py — word diff for the Coherence Pass
 
-Besitzt:
+Contains:
   - compute_diff(original, edited) -> dict
 
-Reiner Text-Helfer, kein IO, keine Abhängigkeit auf andere core-Module.
-Nutzt nur die Python-Standardbibliothek (difflib) — keine neue Dependency.
+Pure text helper, no IO, no dependency on other core modules.
+Uses only the Python standard library (difflib) — no new dependency.
 
-Wird importiert von: app.py — ausschließlich im Kohärenz-Modus
-(source_lang == target_lang), nicht im normalen Übersetzungspfad.
+Imported by: app.py — exclusively in Coherence Mode
+(source_lang == target_lang), not in the normal translation path.
 """
 
 from __future__ import annotations
@@ -20,24 +20,24 @@ _WORD_SPLIT_RE = re.compile(r"(\s+)")
 
 
 def _tokenize(text: str) -> list[str]:
-    """Splittet in Wörter + Whitespace als eigene Tokens — Whitespace bleibt
-    für eine lesbare Diff-Anzeige erhalten, statt beim Join verloren zu gehen."""
+    """Splits into words + whitespace as separate tokens — whitespace is
+    preserved for a readable diff display instead of being lost on join."""
     return [t for t in _WORD_SPLIT_RE.split(text) if t != ""]
 
 
 def compute_diff(original: str, edited: str) -> dict:
-    """Wortweiser Diff zwischen Original und Kohärenz-Pass-Ergebnis.
+    """Word-level diff between the original and the Coherence Pass result.
 
     Returns:
         {
           "segments": [{"tag": "equal"|"insert"|"delete", "text": str}, ...],
-          "similarity": float,   # difflib.SequenceMatcher-Ratio, 0..1
+          "similarity": float,   # difflib.SequenceMatcher ratio, 0..1
         }
 
-    "similarity" dient zugleich als Warnschwelle im Frontend (siehe
-    COHERENCE_WARNING_THRESHOLD in translate.js) — kein separater
-    Fallback-/Drift-Mechanismus wie bei run_s2(), bewusst so entschieden:
-    sichtbarer Hinweis statt stillem Revert.
+    "similarity" also serves as the warning threshold in the frontend (see
+    COHERENCE_WARNING_THRESHOLD in translate.js) — no separate fallback/
+    drift mechanism like run_s2() has, a deliberate choice: a visible
+    notice instead of a silent revert.
     """
     orig_tokens = _tokenize(original)
     edit_tokens = _tokenize(edited)

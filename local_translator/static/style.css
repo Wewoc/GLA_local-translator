@@ -359,7 +359,7 @@ footer {
 .chunk-table tr:last-child .chunk-left,
 .chunk-table tr:last-child .chunk-right { border-bottom: none; }
 
-/* ── Kohärenz-Modus — Diff + Warnhinweis ── */
+/* ── Coherence Mode — diff + warning notice ── */
 .diff-insert {
   background: rgba(192, 132, 252, 0.22);
   color: var(--text);
